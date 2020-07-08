@@ -824,7 +824,19 @@ public class ParserLib {
             this._show_tree(p, indent + 1);
         }
     }
-
+    
+    public String save_tree(ParseTree result, int indent, String tree) {
+    	tree += "   ".repeat(indent) + result.name;
+        System.out.println("   ".repeat(indent) + result.name);
+        for (ParseTree p : result.children) {
+            tree = this.save_tree(p, indent + 1, tree + "\n");
+        }
+        return tree;
+    }
+    public String _save_tree(ParseTree result) {
+    	return this.save_tree(result, 0, "");
+    }
+    
     public void show_tree(ParseTree result) {
         this._show_tree(result, 0);
     }
@@ -849,6 +861,7 @@ public class ParserLib {
         }
         return null;
     }
+
 }
                     
      

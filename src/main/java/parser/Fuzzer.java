@@ -50,25 +50,13 @@ public class Fuzzer {
 	private EarleyParser curr_ep;
 	private ParserLib old_pl;
 	private EarleyParser old_ep;
-	
+	private String tree_key;
 	
 
 	public static void main(String[] args) {
 		Fuzzer fuzzer = new Fuzzer("", 0, null, args[0], null); // Create new Fuzzer; initialize grammar
 		try {
-			Date d_start = new Date();
-			System.out.println("Import ParserLib grammar");
-			fuzzer.setCurr_pl(new ParserLib(fuzzer.getGrammar()));
-			Date d_end = new Date();
-			long difference = d_end.getTime() - d_start.getTime();
-			System.out.println("ParserLib grammar successfully imported in " + difference / 1000 + " seconds");
-			d_start = new Date();
-			System.out.println("Create EarleyParser with ParserLib grammar");
-			fuzzer.setCurr_ep(new EarleyParser(fuzzer.getCurr_pl().grammar));
-			d_end = new Date();
-			difference = d_end.getTime() - d_start.getTime();
-			System.out.println("Successfully created EarleyParser with ParserLib grammar in " + difference / 1000 + " seconds");
-			fuzzer.create_valid_strings(10, false); // Create 20 valid strings; no log level enabled
+			fuzzer.create_valid_strings(2, false); // Create 20 valid strings; no log level enabled
 			// Print out the found strings
 			for(Map.Entry<String, ArrayList<String>> entry : fuzzer.getValid_strings().entrySet()) {
 				String key = entry.getKey();
@@ -108,16 +96,36 @@ public class Fuzzer {
 		 * */
 		int i = 0;
 		while (true) {
+			try {
+				Date d_start = new Date();
+				System.out.println("Import ParserLib grammar");
+				this.setCurr_pl(new ParserLib(this.getGrammar()));
+				Date d_end = new Date();
+				long difference = d_end.getTime() - d_start.getTime();
+				System.out.println("ParserLib grammar successfully imported in " + difference / 1000 + " seconds");
+				d_start = new Date();
+				System.out.println("Create EarleyParser with ParserLib grammar");
+				this.setCurr_ep(new EarleyParser(this.getCurr_pl().grammar));
+				d_end = new Date();
+				difference = d_end.getTime() - d_start.getTime();
+				System.out.println("Successfully created EarleyParser with ParserLib grammar in " + difference / 1000 + " seconds");
+				
+			} catch (Exception e1) {
+				System.out.println("Something went wrong... " + e1.toString());
+				System.exit(1);
+			}
 			String created_string = generate(log_level); // Generate a new valid JSON Object, according to org.json.JSONObject
 			if(created_string != null) {
 				// Check if the created string is also valid according to the "golden grammar"
 		        try {
-		            created_string = "{\"Hello\": }";
+		            // created_string = "{~ \\r\\t  \\b\\f\\n\\b:*Zux\\n\\f\\n,\\t{$<3X_r_).u4`\\n:qB p0a6}\\t\\r \\f\\f\\b:sQB;Ko<pX55X\\n\\r \\b\\n\\f\\r\\f \\n\\f:3`!L)l\\f\\n,E\\b\\t\\f  \\f:8VJK \\f";
+		        	// created_string = "{\"Hello\":}";
 		            ParseTree result = this.getCurr_pl().parse_string(created_string, this.getCurr_ep(), this); // Try to parse the string
 		            this.getCurr_pl().show_tree(result);
-		            System.exit(0);
+		            // this.setTree_key(this.getCurr_pl().save_tree(result, 0));
 		            // The string has been parsed successfully and thus we just continue... 
 		            System.out.println("String " + created_string + " successfully parsed using the golden grammar... Continuing");
+		            // System.exit(0);
 		        } catch (Exception e) { 
 		        	// The string has not been parsed successfully
 		        	// Hence the string is valid for org.json.JSONObject 
@@ -125,40 +133,48 @@ public class Fuzzer {
 		        	
 		            // Now we try to get the smallest input that is causing the error/exception
 		        	List<Column> forTable = this.getCurrTable();
+		        	adjust_grammar:
 		        	for(int j = forTable.size() -1; j >= 0; j--) { // For each chart within the table
 		        		Column c = forTable.get(j);
 		        		ArrayList<String> listOfStates = getStatesFromColumn(c, this.getCurr_pl().grammar); // Returns list of strings <grammarRule1>, <grammarRule2>, ... that had been used to parse the string
 		        		for (int l = 0; l < listOfStates.size(); l++) {
 		        			try {
-		        				String state = listOfStates.get(l);
+		        				// String state = listOfStates.get(l);
 			        			adjustFuzzerTable(listOfStates.get(l)); // Replace a part of the grammar with <anychar>
 		        				ParseTree result = this.getCurr_pl().parse_string(created_string, this.getOld_ep(), this); // Try to parse the string
+			        			System.out.println("Found the " + (i+1) + ". valid string");
 			        			this.getCurr_pl().show_tree(result);
+					            this.setTree_key(this.getCurr_pl().save_tree(result, 0, ""));
+					            // The string has been parsed successfully and thus we just continue... 
+					            System.out.println("String " + created_string + " successfully parsed using the adjusted golden grammar!");
+					            // TODO Set fuer bereits angepasste Grammatiken erstellen, sodass nicht immer ws angepasst wird. 
+					        	ArrayList<String> valid_string_list = getValid_strings().get(this.getTree_key()); // Get the list with valid strings
+					        	// null if empty for the error message
+					        	if(valid_string_list != null) { // Does a valid string for this error already exists?
+					        		// If so, then add the element (valid string) to the list for this key (error message)
+					        		if(!valid_string_list.contains(created_string)) {
+					        			valid_string_list.add(created_string);
+										i++; // Increase the counter
+					        		}
+					        	}
+					        	else { // Key does not exist yet
+					        		// create a new key
+					        		ArrayList<String> new_valid_string_list = new ArrayList<String>();
+					        		new_valid_string_list.add(created_string); // Add the created, "valid" string
+					        		getValid_strings().put(this.getTree_key(), new_valid_string_list); // Add the key-value pair to the valid_strings hashmap
+					        		i++;
+					        	}
+					        	break adjust_grammar;
 							} catch (Exception e2) {
 								this.setOldTable(this.getCurrTable());
 							}
 						}
 		        		// For each (non)terminal within a chart
 		        		// System.out.println(forTable.get(j).toString());
-		        		
 		        	}
-		        	System.out.println("Found the " + (i+1) + ". valid string");
-		        	ArrayList<String> valid_string_list = getValid_strings().get(e.toString()); // Get the list with valid strings
-		        	// null if empty for the error message
-		        	if(valid_string_list != null) { // Does a valid string for this error already exists?
-		        		// If so, then add the element (valid string) to the list for this key (error message)
-		        		if(!valid_string_list.contains(created_string)) {
-		        			valid_string_list.add(created_string);
-							i++; // Increase the counter
-		        		}
-		        	}
-		        	else { // Key does not exist yet
-		        		// create a new key
-		        		ArrayList<String> new_valid_string_list = new ArrayList<String>();
-		        		new_valid_string_list.add(created_string); // Add the created, "valid" string
-		        		getValid_strings().put(e.toString(), new_valid_string_list); // Add the key-value pair to the valid_strings hashmap
-		        		i++;
-		        	}
+		        	// Could not found a valid and relaxed string
+		        	continue;
+		        	
 		        }
 				if(i >= n) { // Did we create enough valid strings?
 					break;
@@ -171,17 +187,29 @@ public class Fuzzer {
 		ArrayList<String> result = new ArrayList<String>();
 		String col = c.toString();
 		// col = col.replace("\n", ""); // Remove \n
-		col = col.replace("|", "");
+		// col = col.replace("|", "");
 		// col = col.replaceAll("[\\d]", "");
 		col = col.replaceAll("chart", "");
 		String[] colRow = col.split("\n");
 		for (int i = colRow.length; i > 0; i--) {
-			if(containsMult(colRow[i-1], "<", 2)) { // Make sure that there is at least one state on the "right" site
-				String[] colRowContent = colRow[i-1].split(":=")[1].split(" ");
-				for (int j = 0; j < colRowContent.length; j++) {
+			if(colRow[i-1].contains("<") && colRow[i-1].contains(">")) {
+			// if(containsMult(colRow[i-1], "<", 1)) { // Make sure that there is at least one state on the "right" site
+				// TODO optimize; both for loops are actually not necessary
+				ArrayList<String> colRowContent = new ArrayList<String>();
+				String[] tmpList = colRow[i-1].split(":=")[0].split(" ");
+				for (String elem : tmpList) {
+					colRowContent.add(elem);
+				}
+				tmpList = colRow[i-1].split(":=")[1].split(" ");
+				for (String elem : tmpList) {
+					if(!colRowContent.contains(elem)) {
+						colRowContent.add(elem);
+					}
+				}
+				for (int j = 0; j < colRowContent.size(); j++) {
 					// System.out.println(colRowContent[j]);
-					if (g.containsKey(colRowContent[j])) { // 
-						result.add(colRowContent[j]);
+					if (g.containsKey(colRowContent.get(j))) { // 
+						result.add(colRowContent.get(j));
 					}
 				}
 				String line = colRow[i-1].split(":=")[1];
@@ -688,6 +716,14 @@ public class Fuzzer {
 
 	public void setOld_ep(EarleyParser old_ep) {
 		this.old_ep = old_ep;
+	}
+
+	public String getTree_key() {
+		return tree_key;
+	}
+
+	public void setTree_key(String tree_key) {
+		this.tree_key = tree_key;
 	}
 	
 }
