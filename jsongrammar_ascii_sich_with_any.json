@@ -2,11 +2,17 @@
     "<start>": [
         [
             "<json>"
+        ],
+        [
+            "<anychar>"
         ]
     ],
     "<json>": [
         [
             "<element>"
+        ],
+        [
+            "<anychar>"
         ]
     ],
     "<value>": [
@@ -30,6 +36,9 @@
         ],
         [
             "null"
+        ],
+        [
+            "<anychar>"
         ]
     ],
     "<object>": [
@@ -39,9 +48,59 @@
             "}"
         ],
         [
+            "<anychar>",
+            "<ws>",
+            "}"
+        ],
+        [
+            "{",
+            "<anychar>",
+            "}"
+        ],
+        [
+            "{",
+            "<ws>",
+            "<anychar>"
+        ],
+        [
+            "<anychar>",
+            "<anychar>",
+            "}"
+        ],
+        [
+            "<anychar>",
+            "<ws>",
+            "<anychar>"
+        ],
+        [
+            "{",
+            "<anychar>",
+            "<anychar>"
+        ],
+        [
+            "<anychar>",
+            "<anychar>",
+            "<anychar>"
+        ],
+        [
             "{",
             "<members>",
             "}"
+        ],
+        [
+            "<anychar>",
+            "<members>",
+            "}"
+        ],
+        [
+            "{",
+            "<members>",
+            "<anychar>"
+        ],
+        [
+            "<anychar>",
+            "<members>",
+            "<anychar>"
         ]
     ],
     "<members>": [
@@ -49,9 +108,42 @@
             "<member>"
         ],
         [
+            "<anychar>"
+        ],
+        [
             "<member>",
             ",",
             "<members>"
+        ],
+        [
+            "<anychar>",
+            ",",
+            "<members>"
+        ],
+        [
+            "<member>",
+            "<anychar>",
+            "<members>"
+        ],
+        [
+            "<member>",
+            ",",
+            "<anychar>"
+        ],
+        [
+            "<anychar>",
+            ",",
+            "<anychar>"
+        ],
+        [
+            "<member>",
+            "<anychar>",
+            "<anychar>"
+        ],
+        [
+            "<anychar>",
+            "<anychar>",
+            "<anychar>"
         ]
     ],
     "<member>": [
@@ -61,6 +153,209 @@
             "<ws>",
             ":",
             "<element>"
+        ],
+        [
+            "<anychar>",
+            "<string>",
+            "<ws>",
+            ":",
+            "<element>"
+        ],
+        [
+            "<ws>",
+            "<anychar>",
+            "<ws>",
+            ":",
+            "<element>"
+        ],
+        [
+            "<ws>",
+            "<string>",
+            "<anychar>",
+            ":",
+            "<element>"
+        ],
+        [
+            "<ws>",
+            "<string>",
+            "<ws>",
+            "<anychar>",
+            "<element>"
+        ],
+        [
+            "<ws>",
+            "<string>",
+            "<ws>",
+            ":",
+            "<anychar>"
+        ],
+        [
+            "<anychar>",
+            "<anychar>",
+            "<ws>",
+            ":",
+            "<element>"
+        ],
+        [
+            "<anychar>",
+            "<string>",
+            "<anychar>",
+            ":",
+            "<element>"
+        ],
+        [
+            "<anychar>",
+            "<string>",
+            "<ws>",
+            "<anychar>",
+            "<element>"
+        ],
+        [
+            "<anychar>",
+            "<string>",
+            "<ws>",
+            ":",
+            "<anychar>"
+        ],
+        [
+            "<ws>",
+            "<anychar>",
+            "<anychar>",
+            ":",
+            "<element>"
+        ],
+        [
+            "<ws>",
+            "<anychar>",
+            "<ws>",
+            "<anychar>",
+            "<element>"
+        ],
+        [
+            "<ws>",
+            "<anychar>",
+            "<ws>",
+            ":",
+            "<anychar>"
+        ],
+        [
+            "<ws>",
+            "<string>",
+            "<anychar>",
+            "<anychar>",
+            "<element>"
+        ],
+        [
+            "<ws>",
+            "<string>",
+            "<anychar>",
+            ":",
+            "<anychar>"
+        ],
+        [
+            "<ws>",
+            "<string>",
+            "<ws>",
+            "<anychar>",
+            "<anychar>"
+        ],
+        [
+            "<anychar>",
+            "<anychar>",
+            "<anychar>",
+            ":",
+            "<element>"
+        ],
+        [
+            "<anychar>",
+            "<anychar>",
+            "<ws>",
+            "<anychar>",
+            "<element>"
+        ],
+        [
+            "<anychar>",
+            "<anychar>",
+            "<ws>",
+            ":",
+            "<anychar>"
+        ],
+        [
+            "<anychar>",
+            "<string>",
+            "<anychar>",
+            "<anychar>",
+            "<element>"
+        ],
+        [
+            "<anychar>",
+            "<string>",
+            "<anychar>",
+            ":",
+            "<anychar>"
+        ],
+        [
+            "<ws>",
+            "<anychar>",
+            "<anychar>",
+            "<anychar>",
+            "<element>"
+        ],
+        [
+            "<ws>",
+            "<anychar>",
+            "<anychar>",
+            ":",
+            "<anychar>"
+        ],
+        [
+            "<ws>",
+            "<string>",
+            "<anychar>",
+            "<anychar>",
+            "<anychar>"
+        ],
+        [
+            "<anychar>",
+            "<anychar>",
+            "<anychar>",
+            "<anychar>",
+            "<element>"
+        ],
+        [
+            "<anychar>",
+            "<anychar>",
+            "<anychar>",
+            ":",
+            "<anychar>"
+        ],
+        [
+            "<anychar>",
+            "<anychar>",
+            "<ws>",
+            "<anychar>",
+            "<anychar>"
+        ],
+        [
+            "<anychar>",
+            "<string>",
+            "<anychar>",
+            "<anychar>",
+            "<anychar>"
+        ],
+        [
+            "<ws>",
+            "<anychar>",
+            "<anychar>",
+            "<anychar>",
+            "<anychar>"
+        ],
+        [
+            "<anychar>",
+            "<anychar>",
+            "<anychar>",
+            "<anychar>",
+            "<anychar>"
         ]
     ],
     "<array>": [
@@ -70,9 +365,94 @@
             "]"
         ],
         [
+            "<anychar>",
+            "<ws>",
+            "]"
+        ],
+        [
+            "[",
+            "<anychar>",
+            "]"
+        ],
+        [
+            "[",
+            "<ws>",
+            "<anychar>"
+        ],
+        [
+            "<anychar>",
+            "<anychar>",
+            "]"
+        ],
+        [
+            "<anychar>",
+            "<ws>",
+            "<anychar>"
+        ],
+        [
+            "[",
+            "<anychar>",
+            "<anychar>"
+        ],
+        [
+            "<anychar>",
+            "<anychar>",
+            "<anychar>"
+        ],
+        [
+            "[",
+            "<ws>",
+            "]"
+        ],
+        [
+            "<anychar>",
+            "<ws>",
+            "]"
+        ],
+        [
+            "[",
+            "<anychar>",
+            "]"
+        ],
+        [
+            "[",
+            "<ws>",
+            "<anychar>"
+        ],
+        [
+            "<anychar>",
+            "<anychar>",
+            "]"
+        ],
+        [
+            "<anychar>",
+            "<ws>",
+            "<anychar>"
+        ],
+        [
+            "[",
+            "<anychar>",
+            "<anychar>"
+        ],
+        [
             "[",
             "<elements>",
             "]"
+        ],
+        [
+            "<anychar>",
+            "<elements>",
+            "]"
+        ],
+        [
+            "[",
+            "<elements>",
+            "<anychar>"
+        ],
+        [
+            "<anychar>",
+            "<elements>",
+            "<anychar>"
         ]
     ],
     "<elements>": [
@@ -80,9 +460,47 @@
             "<element>"
         ],
         [
+            "<anychar>"
+        ],
+        [
             "<element>",
             ",",
             "<elements>"
+        ],
+        [
+            "<anychar>",
+            ",",
+            "<elements>"
+        ],
+        [
+            "<element>",
+            "<anychar>",
+            "<elements>"
+        ],
+        [
+            "<element>",
+            ",",
+            "<anychar>"
+        ],
+        [
+            "<anychar>",
+            "<anychar>",
+            "<elements>"
+        ],
+        [
+            "<anychar>",
+            ",",
+            "<anychar>"
+        ],
+        [
+            "<element>",
+            "<anychar>",
+            "<anychar>"
+        ],
+        [
+            "<anychar>",
+            "<anychar>",
+            "<anychar>"
         ]
     ],
     "<element>": [
@@ -90,6 +508,41 @@
             "<ws>",
             "<value>",
             "<ws>"
+        ],
+        [
+            "<anychar>",
+            "<value>",
+            "<ws>"
+        ],
+        [
+            "<ws>",
+            "<anychar>",
+            "<ws>"
+        ],
+        [
+            "<ws>",
+            "<value>",
+            "<anychar>"
+        ],
+        [
+            "<anychar>",
+            "<anychar>",
+            "<ws>"
+        ],
+        [
+            "<anychar>",
+            "<value>",
+            "<anychar>"
+        ],
+        [
+            "<ws>",
+            "<anychar>",
+            "<anychar>"
+        ],
+        [
+            "<anychar>",
+            "<anychar>",
+            "<anychar>"
         ]
     ],
     "<string>": [
@@ -97,6 +550,41 @@
             "\"",
             "<characters>",
             "\""
+        ],
+        [
+            "<anychar>",
+            "<characters>",
+            "\""
+        ],
+        [
+            "\"",
+            "<anychar>",
+            "\""
+        ],
+        [
+            "\"",
+            "<characters>",
+            "<anychar>"
+        ],
+        [
+            "<anychar>",
+            "<anychar>",
+            "\""
+        ],
+        [
+            "<anychar>",
+            "<characters>",
+            "<anychar>"
+        ],
+        [
+            "\"",
+            "<anychar>",
+            "<anychar>"
+        ],
+        [
+            "<anychar>",
+            "<anychar>",
+            "<anychar>"
         ]
     ],
     "<characters>": [
@@ -104,8 +592,23 @@
             ""
         ],
         [
+            "<anychar>"
+        ],
+        [
             "<character>",
             "<characters>"
+        ],
+        [
+            "<anychar>",
+            "<characters>"
+        ],
+        [
+            "<character>",
+            "<anychar>"
+        ],
+        [
+            "<anychar>",
+            "<anychar>"
         ]
     ],
     "<character>": [
@@ -859,6 +1362,41 @@
             "<integer>",
             "<fraction>",
             "<exponent>"
+        ],
+        [
+            "<anychar>",
+            "<fraction>",
+            "<exponent>"
+        ],
+        [
+            "<integer>",
+            "<anychar>",
+            "<exponent>"
+        ],
+        [
+            "<integer>",
+            "<fraction>",
+            "<anychar>"
+        ],
+        [
+            "<anychar>",
+            "<anychar>",
+            "<exponent>"
+        ],
+        [
+            "<anychar>",
+            "<fraction>",
+            "<anychar>"
+        ],
+        [
+            "<integer>",
+            "<anychar>",
+            "<anychar>"
+        ],
+        [
+            "<anychar>",
+            "<anychar>",
+            "<anychar>"
         ]
     ],
     "<integer>": [
@@ -866,8 +1404,23 @@
             "<digit>"
         ],
         [
+            "<anychar>"
+        ],
+        [
             "<onenine>",
             "<digits>"
+        ],
+        [
+            "<anychar>",
+            "<digits>"
+        ],
+        [
+            "<onenine>",
+            "<anychar>"
+        ],
+        [
+            "<anychar>",
+            "<anychar>"
         ],
         [
             "-",
@@ -875,8 +1428,47 @@
         ],
         [
             "-",
+            "<anychar>"
+        ],
+        [
+            "-",
             "<onenine>",
             "<digits>"
+        ],
+        [
+            "<anychar>",
+            "<onenine>",
+            "<digits>"
+        ],
+        [
+            "-",
+            "<anychar>",
+            "<digits>"
+        ],
+        [
+            "-",
+            "<onenine>",
+            "<anychar>"
+        ],
+        [
+            "<anychar>",
+            "<anychar>",
+            "<digits>"
+        ],
+        [
+            "<anychar>",
+            "<onenine>",
+            "<anychar>"
+        ],
+        [
+            "-",
+            "<anychar>",
+            "<anychar>"
+        ],
+        [
+            "<anychar>",
+            "<anychar>",
+            "<anychar>"
         ]
     ],
     "<digits>": [
@@ -884,8 +1476,23 @@
             "<digit>"
         ],
         [
+            "<anychar>"
+        ],
+        [
             "<digit>",
             "<digits>"
+        ],
+        [
+            "<anychar>",
+            "<digits>"
+        ],
+        [
+            "<digit>",
+            "<anychar>"
+        ],
+        [
+            "<anychar>",
+            "<anychar>"
         ]
     ],
     "<digit>": [
@@ -894,6 +1501,9 @@
         ],
         [
             "<onenine>"
+        ],
+        [
+            "<anychar>"
         ]
     ],
     "<onenine>": [
@@ -930,8 +1540,23 @@
             ""
         ],
         [
+            "<anychar>"
+        ],
+        [
             ".",
             "<digits>"
+        ],
+        [
+            "<anychar>",
+            "<digits>"
+        ],
+        [
+            ".",
+            "<anychar>"
+        ],
+        [
+            "<anychar>",
+            "<anychar>"
         ]
     ],
     "<exponent>": [
@@ -939,15 +1564,68 @@
             ""
         ],
         [
+            "<anychar>"
+        ],
+        [
             "E",
             "<sign>",
             "<digits>"
         ],
         [
+            "<anychar>",
+            "<sign>",
+            "<digits>"
+        ],
+        [
+            "E",
+            "<anychar>",
+            "<digits>"
+        ],
+        [
+            "E",
+            "<sign>",
+            "<anychar>"
+        ],
+        [
+            "<anychar>",
+            "<anychar>",
+            "<digits>"
+        ],
+        [
+            "<anychar>",
+            "<sign>",
+            "<anychar>"
+        ],
+        [
+            "E",
+            "<anychar>",
+            "<anychar>"
+        ],
+        [
+            "<anychar>",
+            "<anychar>",
+            "<anychar>"
+        ],
+        [
             "e",
             "<sign>",
             "<digits>"
-        ]
+        ],
+        [
+            "e",
+            "<anychar>",
+            "<digits>"
+        ],
+        [
+            "e",
+            "<sign>",
+            "<anychar>"
+        ],
+        [
+            "e",
+            "<anychar>",
+            "<anychar>"
+        ],
     ],
     "<sign>": [
         [
@@ -967,6 +1645,21 @@
         [
             "<sp1>",
             "<ws>"
+        ],
+        [
+            "<anychar>",
+            "<ws>"
+        ],
+        [
+            "<sp1>",
+            "<anychar>"
+        ],
+        [
+            "<anychar>",
+            "<anychar>"
+        ],
+        [
+            "<anychar>",
         ]
     ],
     "<sp1>": [
@@ -981,15 +1674,6 @@
         ],
         [
             "\t"
-        ]
-    ],
-    "<anychars>": [
-        [
-            "<anychars>",
-            "<anychar>"
-        ],
-        [
-            ""
         ]
     ],
     "<anychar>": [

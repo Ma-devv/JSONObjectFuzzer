@@ -16,6 +16,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Date;
 
 class GRule extends ArrayList<String> {
     public GRule() {
@@ -184,7 +185,7 @@ class ParseForest implements Iterable<ParseTree> {
 
 interface ParserI {
     ParseForest parse_prefix(String text, String start_symbol);
-    Iterator<ParseTree> parse(String text, String start_symbol) throws ParseException;
+    Iterator<ParseTree> parse(String text, String start_symbol, Fuzzer fuzzer) throws ParseException;
 }
 
 abstract class Parser implements ParserI {
@@ -207,12 +208,12 @@ abstract class Parser implements ParserI {
         }
     }
 
-    public Iterator<ParseTree> parse(String text) throws ParseException {
-        return this.parse(text, this.start_symbol);
+    public Iterator<ParseTree> parse(String text, Fuzzer fuzzer) throws ParseException {
+        return this.parse(text, this.start_symbol, fuzzer);
     }
 
     @Override
-    public Iterator<ParseTree> parse(String text, String start_symbol) throws ParseException {
+    public Iterator<ParseTree> parse(String text, String start_symbol, Fuzzer fuzzer) throws ParseException {
         ParseForest p = this.parse_prefix(text, start_symbol);
 
         if (p.cursor < text.length()) {
@@ -352,6 +353,15 @@ class EarleyParser extends Parser {
     List<String> epsilon;
     List<Column> table;
     private boolean log = false;
+    private String grammar_key = "<object>";
+    
+    public String get_grammar_key() {
+    	return this.grammar_key;
+    }
+    public void set_grammar_key(String grammar_key) {
+    	this.grammar_key = grammar_key;
+    }
+    
     public EarleyParser(Grammar grammar) {
         super(grammar);
         G g = new G(grammar);
@@ -360,10 +370,15 @@ class EarleyParser extends Parser {
 
     void predict(Column col, String sym, State state) {
         for (GRule alt : this.grammar.get(sym)) {
-            col.add(new State(sym, alt, 0, col, null));
+        	State new_state = new State(sym, alt, 0, col, null);
+            col.add(new_state);
+            if(this.log) {
+            	System.out.println("Added " + new_state.toString());
+            }
         }
         if (this.epsilon.contains(sym)) {
-            col.add(state.advance());
+        	State new_state = state.advance();
+            col.add(new_state);
         }
     }
 
@@ -406,6 +421,7 @@ class EarleyParser extends Parser {
     List<Column> fill_chart(List<Column> chart) {
         for (int i = 0; i < chart.size(); i++) {
             Column col = chart.get(i);
+                                                            
             // col.states get modified.
             int j = 0;
             while (j < col.states.size()) {
@@ -413,8 +429,10 @@ class EarleyParser extends Parser {
                 State state = col.states.get(j++);
                 if (state.finished()) {
                     this.complete(col, state);
+                                                       
                 } else {
                     String sym = state.at_dot();
+                                                         
                     if (this.grammar.containsKey(sym)) {
                         this.predict(col, sym, state);
                     } else {
@@ -444,16 +462,17 @@ class EarleyParser extends Parser {
     }
 
 
+
     private void out(String var) {
         System.out.println(var);
     }
 
     @Override
     public ParseForest parse_prefix(String text, String start_symbol) {
-        this.table = this.chart_parse(text, start_symbol);
+        this.table = this.chart_parse(text, start_symbol); 
         List<State> states = new ArrayList<State>();
         for (int i = this.table.size(); i != 0; i--) {
-            Column col = this.table.get(i-1);
+            Column col = this.table.get(i-1); // Need to work on the elements within col (State st)
             for (State st : col.states) {
                 if (st.name.equals(start_symbol)) {
                     states.add(st);
@@ -572,7 +591,7 @@ class EarleyParser extends Parser {
         return pt.iterator();
     }
 
-    public Iterator<ParseTree> parse(String text,String start_symbol) throws ParseException {
+    public Iterator<ParseTree> parse(String text,String start_symbol, Fuzzer fuzzer) throws ParseException {
         ParseForest p = this.parse_prefix(text, start_symbol);
         State start = null;
         for (State s : p.states) {
@@ -580,8 +599,9 @@ class EarleyParser extends Parser {
                 start = s;
             }
         }
-
+        fuzzer.setCurrTable(this.table);
         if (p.cursor < text.length() || (start == null)) {
+        	// NamedForest forest = this.parse_forest(this.table, start);
             throw new ParseException("at " + p.cursor);
         }
 
@@ -809,24 +829,36 @@ public class ParserLib {
         this._show_tree(result, 0);
     }
 
-    public ParseTree parse_text(String text_file) throws ParseException, IOException {
+    public ParseTree parse_text(String text_file, Fuzzer fuzzer) throws ParseException, IOException {
         Path path = FileSystems.getDefault().getPath(text_file);
         String content = Files.readString(path, StandardCharsets.UTF_8);
 
         EarleyParser ep = new EarleyParser(this.grammar);
-        Iterator<ParseTree> result = ep.parse(content);
+        Iterator<ParseTree> result = ep.parse(content, fuzzer);
         if (result.hasNext()) {
             return result.next();
         }
         return null;
     }
-    public ParseTree parse_string(String content) throws ParseException, IOException {
+    public ParseTree parse_string(String content, EarleyParser ep, Fuzzer fuzzer) throws ParseException, IOException {
     	// Equivalent to parse_text but without reading from a file; just parsing the fuzzed input
-        EarleyParser ep = new EarleyParser(this.grammar);
-        Iterator<ParseTree> result = ep.parse(content);
+		// EarleyParser ep = new EarleyParser(this.grammar);
+        Iterator<ParseTree> result = ep.parse(content, fuzzer);
         if (result.hasNext()) {
             return result.next();
         }
         return null;
     }
 }
+                    
+     
+       
+        
+      
+    
+              
+       
+   
+        
+    
+     

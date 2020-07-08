@@ -1,7 +1,10 @@
 package parser;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
@@ -39,18 +42,47 @@ public class Fuzzer {
 	private final String incomplete = "incomplete";
 	private final String complete = "complete";
 	
+	// For Hierarchical Delta Debugging
+	private List<Column> curr_table; // Saves the current table that parse() is generating
+	private List<Column> old_table; // Saves the last table that parse() has been generated
+	private HashMap<String, GDef> adjusted_rule;
+	private ParserLib curr_pl;
+	private EarleyParser curr_ep;
+	private ParserLib old_pl;
+	private EarleyParser old_ep;
+	
+	
+
 	public static void main(String[] args) {
-		Fuzzer fuzzer = new Fuzzer("", 0, null, args[0], null); // Create new Fuzzer
-		fuzzer.create_valid_strings(100, false); // Create 20 valid strings; no log level enabled
-		// Print out the found strings
-		for(Map.Entry<String, ArrayList<String>> entry : fuzzer.getValid_strings().entrySet()) {
-			String key = entry.getKey();
-			ArrayList<String> value = entry.getValue();
-			System.out.println("Found " + value.size() + " inputs for the exception " + key);
-			for(String s : value) {
-				System.out.println("Valid String: " + s + "\n");
+		Fuzzer fuzzer = new Fuzzer("", 0, null, args[0], null); // Create new Fuzzer; initialize grammar
+		try {
+			Date d_start = new Date();
+			System.out.println("Import ParserLib grammar");
+			fuzzer.setCurr_pl(new ParserLib(fuzzer.getGrammar()));
+			Date d_end = new Date();
+			long difference = d_end.getTime() - d_start.getTime();
+			System.out.println("ParserLib grammar successfully imported in " + difference / 1000 + " seconds");
+			d_start = new Date();
+			System.out.println("Create EarleyParser with ParserLib grammar");
+			fuzzer.setCurr_ep(new EarleyParser(fuzzer.getCurr_pl().grammar));
+			d_end = new Date();
+			difference = d_end.getTime() - d_start.getTime();
+			System.out.println("Successfully created EarleyParser with ParserLib grammar in " + difference / 1000 + " seconds");
+			fuzzer.create_valid_strings(10, false); // Create 20 valid strings; no log level enabled
+			// Print out the found strings
+			for(Map.Entry<String, ArrayList<String>> entry : fuzzer.getValid_strings().entrySet()) {
+				String key = entry.getKey();
+				ArrayList<String> value = entry.getValue();
+				System.out.println("Found " + value.size() + " inputs for the exception " + key);
+				for(String s : value) {
+					System.out.println("Valid String: " + s + "\n");
+				}
 			}
+		} catch (Exception e) {
+			System.out.println("Something went wrong...\nError: " + e);
+			System.exit(1);
 		}
+		
 	}
 	
 	// Constructor
@@ -79,16 +111,37 @@ public class Fuzzer {
 			String created_string = generate(log_level); // Generate a new valid JSON Object, according to org.json.JSONObject
 			if(created_string != null) {
 				// Check if the created string is also valid according to the "golden grammar"
-				ParserLib pl;
 		        try {
-		            pl = new ParserLib(getGrammar());
-		            pl.parse_string(created_string); // Try to parse the string
+		            created_string = "{\"Hello\": }";
+		            ParseTree result = this.getCurr_pl().parse_string(created_string, this.getCurr_ep(), this); // Try to parse the string
+		            this.getCurr_pl().show_tree(result);
+		            System.exit(0);
 		            // The string has been parsed successfully and thus we just continue... 
-		            System.out.println("String " + created_string + ". successfully parsed using the golden grammar... Continuing");
+		            System.out.println("String " + created_string + " successfully parsed using the golden grammar... Continuing");
 		        } catch (Exception e) { 
 		        	// The string has not been parsed successfully
 		        	// Hence the string is valid for org.json.JSONObject 
 		        	// but is not according to the golden grammar
+		        	
+		            // Now we try to get the smallest input that is causing the error/exception
+		        	List<Column> forTable = this.getCurrTable();
+		        	for(int j = forTable.size() -1; j >= 0; j--) { // For each chart within the table
+		        		Column c = forTable.get(j);
+		        		ArrayList<String> listOfStates = getStatesFromColumn(c, this.getCurr_pl().grammar); // Returns list of strings <grammarRule1>, <grammarRule2>, ... that had been used to parse the string
+		        		for (int l = 0; l < listOfStates.size(); l++) {
+		        			try {
+		        				String state = listOfStates.get(l);
+			        			adjustFuzzerTable(listOfStates.get(l)); // Replace a part of the grammar with <anychar>
+		        				ParseTree result = this.getCurr_pl().parse_string(created_string, this.getOld_ep(), this); // Try to parse the string
+			        			this.getCurr_pl().show_tree(result);
+							} catch (Exception e2) {
+								this.setOldTable(this.getCurrTable());
+							}
+						}
+		        		// For each (non)terminal within a chart
+		        		// System.out.println(forTable.get(j).toString());
+		        		
+		        	}
 		        	System.out.println("Found the " + (i+1) + ". valid string");
 		        	ArrayList<String> valid_string_list = getValid_strings().get(e.toString()); // Get the list with valid strings
 		        	// null if empty for the error message
@@ -112,9 +165,98 @@ public class Fuzzer {
 				}
 			}
 		}
-		
+	}
+	
+	private ArrayList<String> getStatesFromColumn(Column c, Grammar g) {
+		ArrayList<String> result = new ArrayList<String>();
+		String col = c.toString();
+		// col = col.replace("\n", ""); // Remove \n
+		col = col.replace("|", "");
+		// col = col.replaceAll("[\\d]", "");
+		col = col.replaceAll("chart", "");
+		String[] colRow = col.split("\n");
+		for (int i = colRow.length; i > 0; i--) {
+			if(containsMult(colRow[i-1], "<", 2)) { // Make sure that there is at least one state on the "right" site
+				String[] colRowContent = colRow[i-1].split(":=")[1].split(" ");
+				for (int j = 0; j < colRowContent.length; j++) {
+					// System.out.println(colRowContent[j]);
+					if (g.containsKey(colRowContent[j])) { // 
+						result.add(colRowContent[j]);
+					}
+				}
+				String line = colRow[i-1].split(":=")[1];
+			}
+			
+		}
+		return result;
+	}
+	public boolean containsMult(String source, String regex, int x) {
+		int counter = 0;
+		for (char c : source.toCharArray()) {
+			String s = String.valueOf(c);
+			counter = s.equals(regex) ? counter += 1 : counter;
+		}
+		return counter > x;
+	}
+	private void adjustFuzzerTable(String state) {
+		ParserLib pl_adjusted = null;
+		EarleyParser ep_adjusted = null;
+		this.setOld_pl(this.getCurr_pl());
+		this.setOld_ep(this.getCurr_ep());
+		try {
+			Date d_start = new Date();
+			System.out.println("Import ParserLib grammar");
+			pl_adjusted = new ParserLib(this.getGrammar());
+			Date d_end = new Date();
+			long difference = d_end.getTime() - d_start.getTime();
+			System.out.println("ParserLib grammar successfully imported in " + difference / 1000 + " seconds");
+			System.out.println("Adjust grammar: " + state);
+			GDef anychar = pl_adjusted.grammar.get("<anychars>"); // get <anychars> rule
+			HashMap<String, GDef> save = new HashMap<String, GDef>();
+			save.put(state, pl_adjusted.grammar.get(state)); // TODO might need to save curr_pl instead of pl_adjusted
+			setAdjusted_rule(save); // save old rule
+			pl_adjusted.grammar.put(state, anychar); // update state
+			System.out.println("Grammar " + state + " adjusted");
+			d_start = new Date();
+			System.out.println("Create EarleyParser with ParserLib grammar");
+			ep_adjusted = new EarleyParser(pl_adjusted.grammar);
+			d_end = new Date();
+			difference = d_end.getTime() - d_start.getTime();
+			System.out.println("Successfully created EarleyParser with ParserLib grammar in " + difference / 1000 + " seconds");
+		} catch (Exception e) {
+			System.out.println("Something went wrong: " + e.toString());
+			System.exit(1);
+		}
+		this.setCurr_pl(pl_adjusted);
+		this.setCurr_ep(ep_adjusted);
 		
 	}
+
+	private LinkedHashMap<String, String[]> getElements(Column c) { // Return a Dictionary of strings within a chart
+		/* E.g.:
+		 * Input:
+		 * chart[12]
+		 * <object>:= { <members> } |(0,12)
+		 * <value>:= <object> |(0,12)
+		 * <ws>:= |(12,12)
+		 * <element>:= <ws> <value> <ws> |(0,12)
+		 * <json>:= <element> |(0,12)
+		 * <start>:= <json> |(0,12)
+		 * Return:
+		 * [key,value]
+		 * {"<start>": ["<json>"], "<json>": ["<element>"], "<element>": ["<ws>", "<value>", "<ws>"]}
+		 * 
+		 * */
+		LinkedHashMap<String, String[]> result = new LinkedHashMap<String, String[]>();
+		String chart = c.toString();
+		for(String s : chart.split("\n")) {
+			if (!s.contains("chart")) {
+				System.out.println("");
+			}
+		}
+		return null;
+	}
+
 	private String generate(boolean log_level) {
 		/*
 		 * Feed it one character at a time, and see if the parser rejects it. 
@@ -496,6 +638,56 @@ public class Fuzzer {
 	}
 	public void setValid_strings(Map<String, ArrayList<String>> valid_strings) {
 		this.valid_strings = valid_strings;
+	}	
+	public List<Column> getCurrTable() {
+		return curr_table;
+	}
+	public void setCurrTable(List<Column> table) {
+		this.curr_table = table;
+	}
+	public List<Column> getOldTable() {
+		return old_table;
+	}
+	public void setOldTable(List<Column> table) {
+		this.old_table = table;
+	}
+	public HashMap<String, GDef> getAdjusted_rule() {
+		return adjusted_rule;
+	}
+	public void setAdjusted_rule(HashMap<String, GDef> adjusted_rule) {
+		this.adjusted_rule = adjusted_rule;
 	}
 
+	public ParserLib getCurr_pl() {
+		return curr_pl;
+	}
+
+	public void setCurr_pl(ParserLib curr_pl) {
+		this.curr_pl = curr_pl;
+	}
+
+	public EarleyParser getCurr_ep() {
+		return curr_ep;
+	}
+
+	public void setCurr_ep(EarleyParser curr_ep) {
+		this.curr_ep = curr_ep;
+	}
+
+	public ParserLib getOld_pl() {
+		return old_pl;
+	}
+
+	public void setOld_pl(ParserLib old_pl) {
+		this.old_pl = old_pl;
+	}
+
+	public EarleyParser getOld_ep() {
+		return old_ep;
+	}
+
+	public void setOld_ep(EarleyParser old_ep) {
+		this.old_ep = old_ep;
+	}
+	
 }
