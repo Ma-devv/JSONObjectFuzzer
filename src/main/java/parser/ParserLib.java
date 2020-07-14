@@ -7,6 +7,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import javax.swing.plaf.basic.BasicInternalFrameTitlePane.MaximizeAction;
+
 import org.json.*;
 
 import java.io.IOException;
@@ -833,13 +835,26 @@ public class ParserLib {
         }
         return tree;
     }
-    public String _save_tree(ParseTree result) {
-    	return this.save_tree(result, 0, "");
+    public static String _save_tree(ParserLib pl, ParseTree result) {
+    	return pl.save_tree(result, 0, "");
     }
     
     public void show_tree(ParseTree result) {
         this._show_tree(result, 0);
     }
+    /*
+     * public static void show_tree(ParserLib pl, ParseTree result) {
+        pl._show_tree(result, 0);
+    }
+     * */
+    public int count_nodes(ParseTree tree, int nodeCount) {
+    	int result = nodeCount;
+    	for(ParseTree p : tree.children) {
+    		result = count_nodes(p, result + 1);
+    	}
+    	return result;
+    }
+    
 
     public ParseTree parse_text(String text_file, Fuzzer fuzzer) throws ParseException, IOException {
         Path path = FileSystems.getDefault().getPath(text_file);
