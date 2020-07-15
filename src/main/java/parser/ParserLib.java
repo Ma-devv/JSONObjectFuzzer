@@ -829,7 +829,7 @@ public class ParserLib {
     
     public String save_tree(ParseTree result, int indent, String tree) {
     	tree += "   ".repeat(indent) + result.name;
-        System.out.println("   ".repeat(indent) + result.name);
+        // System.out.println("   ".repeat(indent) + result.name);
         for (ParseTree p : result.children) {
             tree = this.save_tree(p, indent + 1, tree + "\n");
         }
