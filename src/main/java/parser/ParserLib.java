@@ -847,10 +847,13 @@ public class ParserLib {
         pl._show_tree(result, 0);
     }
      * */
-    public int count_nodes(ParseTree tree, int nodeCount) {
+    public int count_nodes(ParseTree tree, int nodeCount, HashSet<String> excludeSet) {
     	int result = nodeCount;
+    	if(excludeSet.contains(tree.name)) {
+    		return result;
+    	}
     	for(ParseTree p : tree.children) {
-    		result = count_nodes(p, result + 1);
+    		result = count_nodes(p, result + 1, excludeSet);
     	}
     	return result;
     }

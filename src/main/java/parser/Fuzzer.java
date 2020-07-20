@@ -1,5 +1,6 @@
 package parser;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -55,11 +56,13 @@ public class Fuzzer {
 	private HashMap<String, ArrayList<ParsedStringSettings>> listForEasiestMod = new HashMap<String, ArrayList<ParsedStringSettings>>();
 	
 	private boolean log = false;
+	private int MAX_INPUT_LENGTH = 100;
+	private HashSet<String> exclude_grammars = new HashSet<>(Arrays.asList("<anychar>", "<anychars>", "<anycharsp>", "<anycharp>"));
 	
 	public static void main(String[] args) {		
 		Fuzzer fuzzer = new Fuzzer("", 0, null, args[0], null); // Create new Fuzzer; initialize grammar
 		try {
-			fuzzer.create_valid_strings(2, fuzzer.log); // Create 20 valid strings; no log level enabled
+			fuzzer.create_valid_strings(50, fuzzer.log); // Create 20 valid strings; no log level enabled
 			// Print out the strings that have been found
 			for(Map.Entry<String, ArrayList<String>> entry : fuzzer.getValid_strings().entrySet()) {
 				String key = entry.getKey();
@@ -132,8 +135,9 @@ public class Fuzzer {
 			if(created_string != null) {
 				// Check if the created string is also valid according to the "golden grammar"
 		        try {
-		            // created_string = "{\"Hello\":}";
-		        	System.out.println("Created string: " + created_string);
+		            // created_string = "{H}";
+		        	// created_string = "{7w\f\b	:e	,A- 'm \f:y 	\b}";
+		        	System.out.println("Created string [" + (i + 1) + "]: " + created_string);
 		            ParseTree result = this.getCurr_pl().parse_string(created_string, this.getCurr_ep(), this); // Try to parse the string
 		            this.getCurr_pl().show_tree(result);
 		            // this.setTree_key(this.getCurr_pl().save_tree(result, 0));
@@ -149,9 +153,10 @@ public class Fuzzer {
 		        	// Now we try to get the smallest input that is causing the error/exception
 		        	if(this.getListForEasiestMod().get(created_string) != null && this.getListForEasiestMod().get(created_string).size() >= 1) {
 		        		determineEasiestModification(created_string);
-		        		System.out.println("\n\nEasiest Modification:\n" + this.getListForEasiestMod().get(created_string));
+		        		System.out.println("Easiest Modification:\n" + this.getListForEasiestMod().get(created_string));
 		        		i++;
 		        	}
+		        	System.out.println("\n");
 		        	// System.exit(0);
 		        }
 				if(i >= n) { // Did we create enough valid strings?
@@ -167,7 +172,7 @@ public class Fuzzer {
 	private void determineEasiestModification(String created_string) {
 		ParsedStringSettings easiestMod = this.getListForEasiestMod().get(created_string).get(0);
 		for(ParsedStringSettings pss : this.getListForEasiestMod().get(created_string)) {
-				if(pss.getTree_size() < easiestMod.getTree_size()) {
+				if(pss.getTree_size() > easiestMod.getTree_size()) {
 					easiestMod = pss;
 				}
 		}
@@ -185,9 +190,10 @@ public class Fuzzer {
     		if(this.log) {
     			System.out.println("\n\n----STATE: " + state + "----");
     		}
-    		if(state.equals("<anychars>") || state.equals("<anychar>")) {
+    		
+    		if(this.getExclude_grammars().contains(state)) {
     			if(this.log) {
-    				System.out.println("Skip anychar rule");
+    				System.out.println("Skip " + state + " rule");
     			}
     			continue;
     		}
@@ -239,7 +245,7 @@ public class Fuzzer {
                 			System.out.println("String " + created_string + " successfully parsed using the adjusted golden grammar");
             			}
         	            ParsedStringSettings pss = new ParsedStringSettings(
-        	            		this.getCurr_pl().count_nodes(result, 0), 
+        	            		this.getCurr_pl().count_nodes(result, 0, this.getExclude_grammars()), 
         	            		state, 
         	            		entry.getValue().get(gRuleC), 
         	            		entry.getValue().get(gRuleC).get(elemC), 
@@ -267,20 +273,88 @@ public class Fuzzer {
     						System.out.println(e.toString());
     	    			}
     				}
-    		
-					
 				}
+			}
+
+			// Add <anycharsp> to the rule and try to parse it again
+			GRule anycharsp = new GRule();
+			anycharsp.add("<anycharsp>");
+			try {
+				// Load the original master grammar
+	        	ParserLib pl_adjusted = null;
+	    		EarleyParser ep_adjusted = null;
+	    		Date d_start = new Date();
+	    		if(this.log) {
+	    			System.out.println("Import ParserLib grammar");
+				}
+				pl_adjusted = new ParserLib(grammar);
+				Date d_end = new Date();
+				long difference = d_end.getTime() - d_start.getTime();
+				if(this.log) {
+					System.out.println("ParserLib grammar successfully imported in " + difference / 1000 + " seconds");
+				}
+				
+				// Replace the rule with <anychars>
+				pl_adjusted.grammar.get(state).add(anycharsp);
+				// rule_set.add(anycharsp.get(0));
+				
+				d_start = new Date();
+				if(this.log) {
+					System.out.println("Create EarleyParser with ParserLib grammar");
+				}
+				ep_adjusted = new EarleyParser(pl_adjusted.grammar);
+				d_end = new Date();
+				difference = d_end.getTime() - d_start.getTime();
+				if(this.log) {
+					System.out.println("Successfully created EarleyParser with ParserLib grammar in " + difference / 1000 + " seconds");
+				}
+        		this.setCurr_pl(pl_adjusted);
+        		this.setCurr_ep(ep_adjusted);
+        		
+        		ParseTree result = this.getCurr_pl().parse_string(created_string, this.getCurr_ep(), this); // Try to parse the string
+        		if(this.log) {
+        			System.out.println("String " + created_string + " successfully parsed using the adjusted golden grammar");
+    			}
+	            ParsedStringSettings pss = new ParsedStringSettings(
+	            		this.getCurr_pl().count_nodes(result, 0, this.getExclude_grammars()), 
+	            		state, 
+	            		null, 
+	            		"ADDED RULE <ANYCHARSP>", 
+	            		result, 
+	            		this.getCurr_pl());
+	            ArrayList<ParsedStringSettings> pss_list = this.getListForEasiestMod().get(created_string);
+	            if(pss_list != null) {
+	            	if(!pss_list.contains(pss)) {
+	            		this.getListForEasiestMod().get(created_string).add(pss);
+	            	}
+	            	else {
+	            		if(this.log) {
+	            			System.out.println("Already contains the same ParsedStringSettings");
+	        			}
+	            	}
+	            }
+	            else {
+	            	ArrayList<ParsedStringSettings> tmp_pss_list = new ArrayList<ParsedStringSettings>();
+	            	tmp_pss_list.add(pss);
+	            	this.getListForEasiestMod().put(created_string, tmp_pss_list);
+	            }
+			} catch (Exception e) {
+				if(this.log) {
+					System.out.println(e.toString());
+    			}
 			}
     		
     	}
     	if(this.log) {
     		System.out.println("\n\nDone with adjusting the grammar for " + created_string + "\n\n");
 		}
-		for(Entry<String, ArrayList<ParsedStringSettings>> pss_list : listForEasiestMod.entrySet()) {
-			for(ParsedStringSettings pss : pss_list.getValue()) {
-				System.out.println(pss.toString());
-			}
-		}
+    	if(this.log) {
+    		for(Entry<String, ArrayList<ParsedStringSettings>> pss_list : listForEasiestMod.entrySet()) {
+    			for(ParsedStringSettings pss : pss_list.getValue()) {
+    				System.out.println(pss.toString());
+    			}
+    		}
+    	}
 	}
 
 	private ArrayList<GRule> getRulesFromEntry(HashMap<String, GDef> master, String key) {
@@ -384,7 +458,7 @@ public class Fuzzer {
 			if(getRv().equals(complete)) { // Return if complete
 				return getCurrent_str();
 			}
-			else if(getCurrent_str().length() >= 1500) { // Unlikely that a string with a size of >1500 characters will end in a valid string
+			else if(getCurrent_str().length() >= MAX_INPUT_LENGTH) { // Unlikely that a string with a size of >1500 characters will end in a valid string
 				// => reset 
 				setCurrent_str(""); //TODO Code duplication => create a new method
 				setPrevious_str("");
@@ -820,6 +894,12 @@ public class Fuzzer {
 		this.listForEasiestMod = listForEasiestMod;
 	}
 
-	
+	public HashSet<String> getExclude_grammars() {
+		return exclude_grammars;
+	}
+
+	public void setExclude_grammars(HashSet<String> exclude_grammars) {
+		this.exclude_grammars = exclude_grammars;
+	}	
 	
 }
