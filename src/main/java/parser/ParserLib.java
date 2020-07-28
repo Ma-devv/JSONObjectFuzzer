@@ -167,6 +167,23 @@ class ParseTree {
         this.name = name;
         this.children = children;
     }
+    private int _count_leafes(ParseTree tree, int nodeCount) {
+    	// System.out.println(tree.name);
+    	int result = nodeCount;
+    	if(tree.children.size() == 0) {
+    		// System.out.println(tree.name);
+    		return 1;
+    	}
+    	for(ParseTree p : tree.children) {
+    		// System.out.println(p.name);
+			result += _count_leafes(p, 0);
+    	}
+    	return result;
+    			
+    }
+    public int count_leafes() {
+    	return this._count_leafes(this, 0);
+    }
 }
 
 class ParseForest implements Iterable<ParseTree> {
@@ -826,6 +843,10 @@ public class ParserLib {
             this._show_tree(p, indent + 1);
         }
     }
+
+    public void show_tree(ParseTree result) {
+        this._show_tree(result, 0);
+    }
     
     public String save_tree(ParseTree result, int indent, String tree) {
     	tree += "   ".repeat(indent) + result.name;
@@ -835,18 +856,25 @@ public class ParserLib {
         }
         return tree;
     }
+    
+    public static String _tree_to_string(ParserLib pl, ParseTree result) {
+    	return pl.tree_to_string(result, 0, "");
+    }
+
+    public String tree_to_string(ParseTree result, int indent, String tree) {
+    	tree += "   ".repeat(indent) + result.name;
+        for (ParseTree p : result.children) {
+        	if(p.name.charAt(0) == '<' && p.name.charAt(p.name.length() - 1) == '>') {
+        		tree = this.tree_to_string(p, indent + 1, tree + "\n");
+        	}
+        }
+        return tree;
+    }
+    
     public static String _save_tree(ParserLib pl, ParseTree result) {
     	return pl.save_tree(result, 0, "");
     }
     
-    public void show_tree(ParseTree result) {
-        this._show_tree(result, 0);
-    }
-    /*
-     * public static void show_tree(ParserLib pl, ParseTree result) {
-        pl._show_tree(result, 0);
-    }
-     * */
     public int count_nodes(ParseTree tree, int nodeCount, HashSet<String> excludeSet) {
     	int result = nodeCount;
     	if(excludeSet.contains(tree.name)) {
@@ -858,7 +886,6 @@ public class ParserLib {
     	return result;
     }
     
-
     public ParseTree parse_text(String text_file, Fuzzer fuzzer) throws ParseException, IOException {
         Path path = FileSystems.getDefault().getPath(text_file);
         String content = Files.readString(path, StandardCharsets.UTF_8);

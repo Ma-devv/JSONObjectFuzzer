@@ -56,7 +56,7 @@ public class Fuzzer {
 	private HashMap<String, ArrayList<ParsedStringSettings>> listForEasiestMod = new HashMap<String, ArrayList<ParsedStringSettings>>();
 	
 	private boolean log = false;
-	private int MAX_INPUT_LENGTH = 100;
+	private final int MAX_INPUT_LENGTH = 100; // Sets the maximal input length when creating a string
 	private HashSet<String> exclude_grammars = new HashSet<>(Arrays.asList("<anychar>", "<anychars>", "<anycharsp>", "<anycharp>"));
 	
 	public static void main(String[] args) {		
@@ -137,6 +137,7 @@ public class Fuzzer {
 		        try {
 		            // created_string = "{H}";
 		        	// created_string = "{7w\f\b	:e	,A- 'm \f:y 	\b}";
+		        	created_string = "{\"abcd\": [{\"pqrs\":}]}";
 		        	System.out.println("Created string [" + (i + 1) + "]: " + created_string);
 		            ParseTree result = this.getCurr_pl().parse_string(created_string, this.getCurr_ep(), this); // Try to parse the string
 		            this.getCurr_pl().show_tree(result);
@@ -245,7 +246,8 @@ public class Fuzzer {
                 			System.out.println("String " + created_string + " successfully parsed using the adjusted golden grammar");
             			}
         	            ParsedStringSettings pss = new ParsedStringSettings(
-        	            		this.getCurr_pl().count_nodes(result, 0, this.getExclude_grammars()), 
+        	            		this.getCurr_pl().count_nodes(result, 0, this.getExclude_grammars()),
+        	            		result.count_leafes(),
         	            		state, 
         	            		entry.getValue().get(gRuleC), 
         	            		entry.getValue().get(gRuleC).get(elemC), 
@@ -279,6 +281,9 @@ public class Fuzzer {
 			// Add <anycharsp> to the rule and try to parse it again
 			GRule anycharsp = new GRule();
 			anycharsp.add("<anycharsp>");
+			if(this.log) {
+				System.out.println("Add <anycharsp> to " + state);
+			}
 			try {
 				// Load the original master grammar
 	        	ParserLib pl_adjusted = null;
@@ -317,6 +322,7 @@ public class Fuzzer {
     			}
 	            ParsedStringSettings pss = new ParsedStringSettings(
 	            		this.getCurr_pl().count_nodes(result, 0, this.getExclude_grammars()), 
+	            		result.count_leafes(),
 	            		state, 
 	            		null, 
 	            		"ADDED RULE <ANYCHARSP>", 
