@@ -1,14 +1,131 @@
 package parser;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.Date;
+import java.util.HashSet;
 import java.util.PriorityQueue;
 
 public class HDD {
+	private boolean log = false;
 	
-	public void perses_delta_debug(ParseTree tree) {
+	/*
+	 * Searches for subtrees whose name matches symbol
+	 * */
+	public ArrayList<ParseTreeTuple> subtrees_with_symbol(ParseTree tree, String symbol, ArrayList<ParseTreeTuple> result, int depth) {
+		if(result == null) {
+			result = new ArrayList<ParseTreeTuple>();
+		}
+		if(tree.name.equals(symbol)) {
+			ParseTreeTuple ptt = new ParseTreeTuple(depth, tree);
+			result.add(ptt);
+		}
+		for(ParseTree c : tree.children) {
+			subtrees_with_symbol(c, symbol, result, depth+1);
+		}
+		return result;
+	}
+	public ParsedStringSettings perses_delta_debug(ParseTree tree, Grammar grammar, ParsedStringSettings master_pss, HashSet<String> excludeSet) {
+		ParsedStringSettings result = null;
 		ParseTree pt = new ParseTree(tree.name, tree.children); // create new ParseTree object (deep copy)
-		PriorityQueue<ParseTreeTuple> pq = new PriorityQueue<ParseTreeTuple>();
-		pq.add(new ParseTreeTuple(pt.count_leafes(), pt));
+		ParseTreeTupleComparator pttComp = new ParseTreeTupleComparator();
+		PriorityQueue<ParseTreeTuple> pq = new PriorityQueue<ParseTreeTuple>(new ParseTreeTupleComparator());
+		pq.add(new ParseTreeTuple(pt.count_leafes(), pt)); // Add the "root" tree to the key to get started
+		while(!pq.isEmpty()) { // While there are trees in the queue
+			ParseTree reprocess = null;
+			ParseTree biggest_node = pq.poll().getPt(); // Get the "biggest" node
+			if(this.log) {
+				System.out.println("\nbiggest node:\n" + biggest_node.save_tree());
+			}
+			String bsymbol = biggest_node.name; // Get the "biggest" symbol
+			// We need the biggest symbol to find subtrees with the same name/token
+			ArrayList<ParseTreeTuple> ssubtrees = subtrees_with_symbol(biggest_node, bsymbol, null, 0);
+			// Now discard the first entry of ssubtrees as this should be the tree itself
+			ssubtrees.remove(0);
+			// Sort the found subtrees according to their DEPTH (not leafe size, why?) TODO
+			ssubtrees.sort(new ParseTreeTupleComparator());
+			
+			for(int i = ssubtrees.size()-1; i >= 0; i--) { // Loop in reversed order
+				ParseTreeTuple stree = ssubtrees.get(i);
+				// System.out.format("Old biggest node:\n%s\nNew biggest node:\n%s\n", biggest_node.save_tree(), stree.getPt().save_tree());
+				replaceBiggestNode(biggest_node, stree);
+				// Results in us having a new set of characters that we can try to parse using the adjusted grammar
+				ParsedStringSettings pss = checkIfPossibleToParse(master_pss, stree.getPt().tree_to_string(), excludeSet, bsymbol);
+				if(pss != null) { // Now we have to check if the modified non terminals can be parsed again using the adjusted grammar
+					// If it is possible to parse the adjusted string with the adjusted grammar, then we proceed
+					reprocess = stree.getPt();
+					result = pss;
+					break;
+				}
+			}
+			if(reprocess != null) { // Did we found a subtree/sub-input that has been parsed successfully?
+				biggest_node = reprocess;
+				ParseTreeTuple t_ptt = new ParseTreeTuple(biggest_node.count_leafes(), biggest_node);
+				pq.add(t_ptt);
+			}
+			else {
+				for(ParseTree stree : biggest_node.children) {
+					if(stree.is_nt()) {
+						ParseTreeTuple t_ptt = new ParseTreeTuple(stree.count_leafes(), stree);
+						pq.add(t_ptt);
+					}
+				}
+			}
+		}
+		return result;
 		
+	}
+	
+	private ParsedStringSettings checkIfPossibleToParse(ParsedStringSettings master_pss, String adjusted_string, HashSet<String> excludeSet, String bsymbol) {
+		try {
+			if(this.log) {
+				System.out.println("HDD: Adjusted string: " + adjusted_string);
+			}
+			EarleyParser ep_adjusted = null;
+    		Date d_start = new Date();
+			Date d_end = new Date();
+    		// Replace the rule with <anychars>
+			d_start = new Date();
+			if(this.log) {
+				System.out.println("HDD: Create EarleyParser with ParserLib grammar");
+			}
+			ep_adjusted = new EarleyParser(master_pss.getPl().grammar);
+			d_end = new Date();
+			long difference = d_end.getTime() - d_start.getTime();
+			if(this.log) {
+				System.out.println("HDD: Successfully created EarleyParser with ParserLib grammar in " + difference / 1000 + " seconds");
+			}
+			
+    		ParseTree result = master_pss.getPl().parse_string(adjusted_string, ep_adjusted); // Try to parse the string
+    		if(this.log) {
+    			System.out.println("HDD: String " + adjusted_string + " successfully parsed using the adjusted golden grammar");
+			}
+            ParsedStringSettings pss = new ParsedStringSettings(
+            		String.format("Original string: %s => adjusted string: %s", master_pss.getCreated_string(), adjusted_string),
+            		result.count_nodes(0, excludeSet),
+            		result.count_leafes(),
+            		master_pss.getChanged_rule(), 
+            		master_pss.getChanged_token(), 
+            		master_pss.getChanged_elem() + "\nOld tree:\n" + master_pss.getTree().save_tree(), 
+            		result,
+            		master_pss.getPl());
+            return pss;
+		} catch (Exception e) {
+			// System.out.println("HDD: " + e);
+		}
+		return null;
+	}
+	/*
+	 * Replace the given node "biggest_node" with the subtree "stree" 
+	 * 
+	 * */
+	private void replaceBiggestNode(ParseTree biggest_node, ParseTreeTuple stree) {
+		biggest_node = stree.getPt();
+	}
+	
+	public ParsedStringSettings startHDD(ParsedStringSettings pss, HashSet<String> excludeSet){
+		return perses_delta_debug(pss.getTree(), pss.getPl().grammar, pss, excludeSet);
 	}
 	
 }

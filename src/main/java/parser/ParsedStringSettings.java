@@ -1,6 +1,7 @@
 package parser;
 
 public class ParsedStringSettings {
+	private String created_string;
 	private int tree_size;
 	private int leaf_size;
 	private String changed_rule;
@@ -9,8 +10,9 @@ public class ParsedStringSettings {
 	private ParseTree tree;
 	private ParserLib pl;
 	
-	public ParsedStringSettings(int tree_size, int leaf_size, String changed_rule, GRule token, String changed_elem, ParseTree tree, ParserLib pl) {
+	public ParsedStringSettings(String created_string, int tree_size, int leaf_size, String changed_rule, GRule token, String changed_elem, ParseTree tree, ParserLib pl) {
 		super();
+		this.created_string = created_string;
 		this.tree_size = tree_size;
 		this.leaf_size = leaf_size;
 		this.changed_rule = changed_rule;
@@ -63,14 +65,22 @@ public class ParsedStringSettings {
 		this.pl = pl;
 	}
 
+	public String getCreated_string() {
+		return created_string;
+	}
+	public void setCreated_string(String created_string) {
+		this.created_string = created_string;
+	}
+
 	@Override
 	public String toString() {
-		String result = String.format("Adjusted rule: %s\nAdjusted Token: %s\nAdjusted Element: %s\nTree size: %d\nTree: %s\nLeaf size: %d\n", 
+		String result = String.format("String: %s\nAdjusted rule: %s\nAdjusted Token: %s\nAdjusted Element: %s\nTree size: %d\nTree:\n%s\nLeaf size: %d\n", 
+				this.getCreated_string(), // Created string
 				this.getChanged_rule(), // Adjusted rule 
 				this.getChanged_token(), // Adjusted Token 
 				this.getChanged_elem(), // Adjusted Element
 				this.getTree_size(), // Tree size 
-				ParserLib._save_tree(this.getPl(), this.getTree()), // Tree
+				this.getTree().save_tree(), // Tree
 				this.getLeaf_size()); // Leaf size
 		return result;
 	}

@@ -184,6 +184,47 @@ class ParseTree {
     public int count_leafes() {
     	return this._count_leafes(this, 0);
     }
+    public boolean is_nt() {
+    	return (this.name.charAt(0) == '<' && this.name.charAt(this.name.length() - 1) == '>');
+    }
+    public String tree_to_string() {
+    	return this._tree_to_string(this, "");
+    }
+    
+    /*
+     * Returns the name/value of the non terminals
+     * 
+     * */
+    private String _tree_to_string(ParseTree result, String tree) {
+    	if(!(result.is_nt())) {
+    		return result.name;
+    	}
+        for (ParseTree p : result.children) {
+        	tree += p._tree_to_string(p, "");
+        }
+        return tree;
+    }
+    public int count_nodes(int nodeCount, HashSet<String> excludeSet) {
+    	int result = nodeCount;
+    	if(excludeSet.contains(this.name)) {
+    		return result;
+    	}
+    	for(ParseTree p : this.children) {
+    		result = p.count_nodes(result + 1, excludeSet);
+    	}
+    	return result;
+    }
+    private String _save_tree(int indent, String tree) {
+    	tree += "   ".repeat(indent) + this.name;
+        for (ParseTree p : this.children) {
+            tree = p._save_tree(indent + 1, tree + "\n");
+        }
+        return tree;
+    }
+
+    public String save_tree() {
+    	return this._save_tree(0, "");
+    }
 }
 
 class ParseForest implements Iterable<ParseTree> {
@@ -204,7 +245,7 @@ class ParseForest implements Iterable<ParseTree> {
 
 interface ParserI {
     ParseForest parse_prefix(String text, String start_symbol);
-    Iterator<ParseTree> parse(String text, String start_symbol, Fuzzer fuzzer) throws ParseException;
+    Iterator<ParseTree> parse(String text, String start_symbol) throws ParseException;
 }
 
 abstract class Parser implements ParserI {
@@ -227,12 +268,12 @@ abstract class Parser implements ParserI {
         }
     }
 
-    public Iterator<ParseTree> parse(String text, Fuzzer fuzzer) throws ParseException {
-        return this.parse(text, this.start_symbol, fuzzer);
+    public Iterator<ParseTree> parse(String text) throws ParseException {
+        return this.parse(text, this.start_symbol);
     }
 
     @Override
-    public Iterator<ParseTree> parse(String text, String start_symbol, Fuzzer fuzzer) throws ParseException {
+    public Iterator<ParseTree> parse(String text, String start_symbol) throws ParseException {
         ParseForest p = this.parse_prefix(text, start_symbol);
 
         if (p.cursor < text.length()) {
@@ -610,7 +651,7 @@ class EarleyParser extends Parser {
         return pt.iterator();
     }
 
-    public Iterator<ParseTree> parse(String text,String start_symbol, Fuzzer fuzzer) throws ParseException {
+    public Iterator<ParseTree> parse(String text,String start_symbol) throws ParseException {
         ParseForest p = this.parse_prefix(text, start_symbol);
         State start = null;
         for (State s : p.states) {
@@ -618,7 +659,6 @@ class EarleyParser extends Parser {
                 start = s;
             }
         }
-        fuzzer.setCurrTable(this.table);
         if (p.cursor < text.length() || (start == null)) {
         	// NamedForest forest = this.parse_forest(this.table, start);
             throw new ParseException("at " + p.cursor);
@@ -848,59 +888,21 @@ public class ParserLib {
         this._show_tree(result, 0);
     }
     
-    public String save_tree(ParseTree result, int indent, String tree) {
-    	tree += "   ".repeat(indent) + result.name;
-        // System.out.println("   ".repeat(indent) + result.name);
-        for (ParseTree p : result.children) {
-            tree = this.save_tree(p, indent + 1, tree + "\n");
-        }
-        return tree;
-    }
-    
-    public static String _tree_to_string(ParserLib pl, ParseTree result) {
-    	return pl.tree_to_string(result, 0, "");
-    }
-
-    public String tree_to_string(ParseTree result, int indent, String tree) {
-    	tree += "   ".repeat(indent) + result.name;
-        for (ParseTree p : result.children) {
-        	if(p.name.charAt(0) == '<' && p.name.charAt(p.name.length() - 1) == '>') {
-        		tree = this.tree_to_string(p, indent + 1, tree + "\n");
-        	}
-        }
-        return tree;
-    }
-    
-    public static String _save_tree(ParserLib pl, ParseTree result) {
-    	return pl.save_tree(result, 0, "");
-    }
-    
-    public int count_nodes(ParseTree tree, int nodeCount, HashSet<String> excludeSet) {
-    	int result = nodeCount;
-    	if(excludeSet.contains(tree.name)) {
-    		return result;
-    	}
-    	for(ParseTree p : tree.children) {
-    		result = count_nodes(p, result + 1, excludeSet);
-    	}
-    	return result;
-    }
-    
-    public ParseTree parse_text(String text_file, Fuzzer fuzzer) throws ParseException, IOException {
+    public ParseTree parse_text(String text_file) throws ParseException, IOException {
         Path path = FileSystems.getDefault().getPath(text_file);
         String content = Files.readString(path, StandardCharsets.UTF_8);
 
         EarleyParser ep = new EarleyParser(this.grammar);
-        Iterator<ParseTree> result = ep.parse(content, fuzzer);
+        Iterator<ParseTree> result = ep.parse(content);
         if (result.hasNext()) {
             return result.next();
         }
         return null;
     }
-    public ParseTree parse_string(String content, EarleyParser ep, Fuzzer fuzzer) throws ParseException, IOException {
+    public ParseTree parse_string(String content, EarleyParser ep) throws ParseException, IOException {
     	// Equivalent to parse_text but without reading from a file; just parsing the fuzzed input
 		// EarleyParser ep = new EarleyParser(this.grammar);
-        Iterator<ParseTree> result = ep.parse(content, fuzzer);
+        Iterator<ParseTree> result = ep.parse(content);
         if (result.hasNext()) {
             return result.next();
         }
