@@ -45,6 +45,8 @@ public class Fuzzer {
 	// For Hierarchical Delta Debugging
 	private List<Column> curr_table; // Saves the current table that parse() is generating
 	private List<Column> old_table; // Saves the last table that parse() has been generated
+	private ParserLib golden_grammar_PL;
+	private EarleyParser golden_grammar_EP;
 	private HashMap<String, GDef> adjusted_rule = new HashMap<String, GDef>();
 	private ParserLib curr_pl;
 	private EarleyParser curr_ep;
@@ -126,7 +128,9 @@ public class Fuzzer {
 				if(this.log) {
 					System.out.println("Successfully created EarleyParser with ParserLib grammar in " + difference / 1000 + " seconds");
 				}
-				
+				// Set golden grammar ParserLib as well as EarleyParser
+				this.setGolden_grammar_PL(this.getCurr_pl());
+				this.setGolden_grammar_EP(this.getCurr_ep());
 			} catch (Exception e1) {
 				System.out.println("Something went wrong... " + e1.toString());
 				System.exit(1);
@@ -138,6 +142,7 @@ public class Fuzzer {
 		            // created_string = "{H}";
 		        	// created_string = "{7w\f\b	:e	,A- 'm \f:y 	\b}";
 		        	created_string = "{\"abcd\": [{\"pqrs\":}]}";
+		        	// created_string = "\"abcd\"";
 		        	System.out.println("Created string [" + (i + 1) + "]: " + created_string);
 		            ParseTree result = this.getCurr_pl().parse_string(created_string, this.getCurr_ep()); // Try to parse the string
 		            this.getCurr_pl().show_tree(result);
@@ -255,11 +260,8 @@ public class Fuzzer {
         	            		result, 
         	            		this.getCurr_pl());
         	            // System.out.println(pss.toString());
-        	            if(state.equals("<object>")) {
-        	            	System.out.println("");
-        	            }
         	            HDD hdd = new HDD();
-        	            ParsedStringSettings minimal_input_for_rule = hdd.startHDD(pss, this.getExclude_grammars());
+        	            ParsedStringSettings minimal_input_for_rule = hdd.startHDD(pss, this.getExclude_grammars(), this.getGolden_grammar_PL(), this.getGolden_grammar_EP());
         	            // System.out.println("Minimal input for " + created_string + ": " + minimal_input_for_rule);
         	            if(minimal_input_for_rule != null) { // Could we minimize the input?
         	            	ArrayList<ParsedStringSettings> pss_list = this.getListForEasiestMod().get(created_string);
@@ -358,7 +360,7 @@ public class Fuzzer {
 	            		this.getCurr_pl());
 	            // System.out.println(pss.toString());
 	            HDD hdd = new HDD();
-	            ParsedStringSettings minimal_input_for_rule = hdd.startHDD(pss, this.getExclude_grammars());
+	            ParsedStringSettings minimal_input_for_rule = hdd.startHDD(pss, this.getExclude_grammars(), this.getGolden_grammar_PL(), this.getGolden_grammar_EP());
 	            // System.out.println(minimal_input_for_rule.toString());
 	            if(minimal_input_for_rule != null) {
 	            	ArrayList<ParsedStringSettings> pss_list = this.getListForEasiestMod().get(created_string);
@@ -409,6 +411,7 @@ public class Fuzzer {
     	if(true) {
     		for(Entry<String, ArrayList<ParsedStringSettings>> pss_list : listForEasiestMod.entrySet()) {
     			for(ParsedStringSettings pss : pss_list.getValue()) {
+
     				System.out.println(pss.toString());
     				// System.out.println("Terminals: " + pss.getTree().tree_to_string());
     			}
@@ -949,17 +952,25 @@ public class Fuzzer {
 	public HashMap<String, ArrayList<ParsedStringSettings>> getListForEasiestMod() {
 		return listForEasiestMod;
 	}
-
 	public void setListForEasiestMod(HashMap<String, ArrayList<ParsedStringSettings>> listForEasiestMod) {
 		this.listForEasiestMod = listForEasiestMod;
 	}
-
 	public HashSet<String> getExclude_grammars() {
 		return exclude_grammars;
 	}
-
 	public void setExclude_grammars(HashSet<String> exclude_grammars) {
 		this.exclude_grammars = exclude_grammars;
-	}	
-	
+	}
+	public ParserLib getGolden_grammar_PL() {
+		return golden_grammar_PL;
+	}
+	public void setGolden_grammar_PL(ParserLib golden_grammar_PL) {
+		this.golden_grammar_PL = golden_grammar_PL;
+	}
+	public EarleyParser getGolden_grammar_EP() {
+		return golden_grammar_EP;
+	}
+	public void setGolden_grammar_EP(EarleyParser golden_grammar_EP) {
+		this.golden_grammar_EP = golden_grammar_EP;
+	}
 }

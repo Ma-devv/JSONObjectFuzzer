@@ -74,13 +74,17 @@ public class ParsedStringSettings {
 
 	@Override
 	public String toString() {
-		String result = String.format("String: %s\nAdjusted rule: %s\nAdjusted Token: %s\nAdjusted Element: %s\nTree size: %d\nTree:\n%s\nLeaf size: %d\n", 
+		if(this.getChanged_rule().equals("<elements>")) {
+			System.out.println("");
+		}
+		String result = String.format("String: %s\nAdjusted rule: %s\nAdjusted Token: %s\nAdjusted Element: %s\nTree size: %d\nTree:\n%s\nTree wo <anychars>:\n%s\nLeaf size: %d\n", 
 				this.getCreated_string(), // Created string
 				this.getChanged_rule(), // Adjusted rule 
 				this.getChanged_token(), // Adjusted Token 
 				this.getChanged_elem(), // Adjusted Element
 				this.getTree_size(), // Tree size 
 				this.getTree().save_tree(), // Tree
+				this.getTree().tree_print_nterminals_wo_anychars(), // Test
 				this.getLeaf_size()); // Leaf size
 		return result;
 	}

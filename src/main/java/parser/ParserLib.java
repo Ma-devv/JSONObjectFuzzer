@@ -163,6 +163,7 @@ class G {
 class ParseTree {
     String name;
     ArrayList<ParseTree> children;
+    private boolean indented_nt = false;
     public ParseTree(String name, ArrayList<ParseTree> children) {
         this.name = name;
         this.children = children;
@@ -204,7 +205,66 @@ class ParseTree {
         }
         return tree;
     }
-    public int count_nodes(int nodeCount, HashSet<String> excludeSet) {
+    
+    public String tree_print_nterminals_wo_anychars() {
+    	return this._tree_print_nterminals_wo_anychars(this, "", 0, false, this);
+    }
+    
+    /*
+     * Returns the name/value of the non terminals
+     * 
+     * */
+    private String _tree_print_nterminals_wo_anychars(ParseTree result, String tree, int indent, boolean seen_anychar, ParseTree master) {
+    	if(!(result.is_nt())) {
+			if(seen_anychar) {
+				if(indented_nt) {
+					tree += result.name;
+				}
+				else {
+					indented_nt = true;
+					// Patch all the other childs
+					setIndentedTrue(master);
+					tree += "   ".repeat(indent+1) + "<anychar/s/p>\n";
+					tree += "   ".repeat(indent+2) + this.name;
+				}
+    		}
+			else {
+				if(indented_nt) {
+					tree += "\n";
+					tree += "   ".repeat(indent) + this.name + "\n";
+				}
+				else {
+					tree += "   ".repeat(indent) + this.name + "\n";
+				}
+    		}
+    	}
+    	else if(!(result.name.equals("<anychars>") || result.name.equals("<anychar>") || result.name.equals("<anycharsp>") || result.name.equals("<anycharp>"))) {
+    		if(indented_nt) {
+    			tree += "   ".repeat(indent) + this.name + "\n";
+    		}
+    		else {
+    			tree += "   ".repeat(indent) + this.name + "\n";
+    		}
+    	}
+    	else{
+    		// Seen <anychars>
+    		seen_anychar = true;
+    		indent -= 1;
+    	}
+        for (ParseTree p : this.children) {
+            tree = p._tree_print_nterminals_wo_anychars(p, tree, indent + 1, seen_anychar, master);
+        }
+        return tree;
+    }
+    
+    private void setIndentedTrue(ParseTree master) {
+    	master.indented_nt = true;
+		for(ParseTree pt : master.children) {
+			setIndentedTrue(pt);
+		}
+		
+	}
+	public int count_nodes(int nodeCount, HashSet<String> excludeSet) {
     	int result = nodeCount;
     	if(excludeSet.contains(this.name)) {
     		return result;

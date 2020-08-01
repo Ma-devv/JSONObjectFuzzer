@@ -13,6 +13,8 @@ public class HDD {
 	/*
 	 * Searches for subtrees whose name matches symbol
 	 * */
+	private ParserLib golden_grammar_PL;
+	private EarleyParser golden_grammar_EP;
 	public ArrayList<ParseTreeTuple> subtrees_with_symbol(ParseTree tree, String symbol, ArrayList<ParseTreeTuple> result, int depth) {
 		if(result == null) {
 			result = new ArrayList<ParseTreeTuple>();
@@ -79,42 +81,52 @@ public class HDD {
 	
 	private ParsedStringSettings checkIfPossibleToParse(ParsedStringSettings master_pss, String adjusted_string, HashSet<String> excludeSet, String bsymbol) {
 		try {
+			// The given string should be rejected by the golden grammar ...
+			this.getGolden_grammar_PL().parse_string(adjusted_string, this.getGolden_grammar_EP()); // Try to parse the string; return value can be obtained
+			// If the golden grammar parses the string, we will discard the string => return null
 			if(this.log) {
-				System.out.println("HDD: Adjusted string: " + adjusted_string);
+				System.out.println("Adjusted string: " + adjusted_string + " successfully parsed using the golden grammar");
 			}
-			EarleyParser ep_adjusted = null;
-    		Date d_start = new Date();
-			Date d_end = new Date();
-    		// Replace the rule with <anychars>
-			d_start = new Date();
-			if(this.log) {
-				System.out.println("HDD: Create EarleyParser with ParserLib grammar");
-			}
-			ep_adjusted = new EarleyParser(master_pss.getPl().grammar);
-			d_end = new Date();
-			long difference = d_end.getTime() - d_start.getTime();
-			if(this.log) {
-				System.out.println("HDD: Successfully created EarleyParser with ParserLib grammar in " + difference / 1000 + " seconds");
-			}
-			
-    		ParseTree result = master_pss.getPl().parse_string(adjusted_string, ep_adjusted); // Try to parse the string
-    		if(this.log) {
-    			System.out.println("HDD: String " + adjusted_string + " successfully parsed using the adjusted golden grammar");
-			}
-            ParsedStringSettings pss = new ParsedStringSettings(
-            		String.format("Original string: %s => adjusted string: %s", master_pss.getCreated_string(), adjusted_string),
-            		result.count_nodes(0, excludeSet),
-            		result.count_leafes(),
-            		master_pss.getChanged_rule(), 
-            		master_pss.getChanged_token(), 
-            		master_pss.getChanged_elem() + "\nOld tree:\n" + master_pss.getTree().save_tree(), 
-            		result,
-            		master_pss.getPl());
-            return pss;
+			return null;
 		} catch (Exception e) {
-			// System.out.println("HDD: " + e);
+			// ... and should be parsed using the adjusted golden grammar
+			try {
+				if(this.log) {
+					System.out.println("HDD: Adjusted string: " + adjusted_string);
+				}
+				EarleyParser ep_adjusted = null;
+	    		Date d_start = new Date();
+				Date d_end = new Date();
+	    		// Replace the rule with <anychars>
+				d_start = new Date();
+				if(this.log) {
+					System.out.println("HDD: Create EarleyParser with ParserLib grammar");
+				}
+				ep_adjusted = new EarleyParser(master_pss.getPl().grammar);
+				d_end = new Date();
+				long difference = d_end.getTime() - d_start.getTime();
+				if(this.log) {
+					System.out.println("HDD: Successfully created EarleyParser with ParserLib grammar in " + difference / 1000 + " seconds");
+				}
+				
+	    		ParseTree result = master_pss.getPl().parse_string(adjusted_string, ep_adjusted); // Try to parse the string
+	    		if(this.log) {
+	    			System.out.println("HDD: String " + adjusted_string + " successfully parsed using the adjusted golden grammar");
+				}
+	            ParsedStringSettings pss = new ParsedStringSettings(
+	            		String.format("Original string: %s => adjusted string: %s", master_pss.getCreated_string(), adjusted_string),
+	            		result.count_nodes(0, excludeSet),
+	            		result.count_leafes(),
+	            		master_pss.getChanged_rule(), 
+	            		master_pss.getChanged_token(), 
+	            		master_pss.getChanged_elem() + "\nOld tree:\n" + master_pss.getTree().save_tree(), 
+	            		result,
+	            		master_pss.getPl());
+	            return pss;
+			} catch (Exception e2) {
+				return null;
+			}
 		}
-		return null;
 	}
 	/*
 	 * Replace the given node "biggest_node" with the subtree "stree" 
@@ -124,8 +136,22 @@ public class HDD {
 		biggest_node = stree.getPt();
 	}
 	
-	public ParsedStringSettings startHDD(ParsedStringSettings pss, HashSet<String> excludeSet){
+	public ParsedStringSettings startHDD(ParsedStringSettings pss, HashSet<String> excludeSet, ParserLib golden_grammar_PL, EarleyParser golden_grammar_EP){
+		this.setGolden_grammar_PL(golden_grammar_PL);
+		this.setGolden_grammar_EP(golden_grammar_EP);
 		return perses_delta_debug(pss.getTree(), pss.getPl().grammar, pss, excludeSet);
+	}
+	public ParserLib getGolden_grammar_PL() {
+		return golden_grammar_PL;
+	}
+	public void setGolden_grammar_PL(ParserLib golden_grammar_PL) {
+		this.golden_grammar_PL = golden_grammar_PL;
+	}
+	public EarleyParser getGolden_grammar_EP() {
+		return golden_grammar_EP;
+	}
+	public void setGolden_grammar_EP(EarleyParser golden_grammar_EP) {
+		this.golden_grammar_EP = golden_grammar_EP;
 	}
 	
 }
