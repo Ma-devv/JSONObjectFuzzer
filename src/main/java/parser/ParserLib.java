@@ -163,7 +163,8 @@ class G {
 class ParseTree {
     String name;
     ArrayList<ParseTree> children;
-    private boolean indented_nt = false;
+    private boolean indented_nt = false; // TODO change - howto?
+    private boolean anychar_seen_gpofa = false; // TODO change GPOFA: getPosOfFristAnychar()
     public ParseTree(String name, ArrayList<ParseTree> children) {
         this.name = name;
         this.children = children;
@@ -257,6 +258,25 @@ class ParseTree {
         return tree;
     }
     
+    private String _removeAnycharChars(ParseTree pt, String s, boolean seen_anychar) {
+    	if(pt.is_nt() && seen_anychar) {
+    		s += pt.name;
+    	}
+    	else if(pt.name.equals("<anychars>") || pt.name.equals("<anychar>") || pt.name.equals("<anycharsp>") || pt.name.equals("<anycharp>")) {
+    		seen_anychar = true;
+    	}
+    	
+    	for(ParseTree p : pt.children) {
+    		s = _removeAnycharChars(p, s, seen_anychar);
+    	}
+    	return s;
+    	
+    }
+    
+    public String removeAnycharChars() {
+    	return _removeAnycharChars(this, "", false);
+    }
+    
     private void setIndentedTrue(ParseTree master) {
     	master.indented_nt = true;
 		for(ParseTree pt : master.children) {
@@ -284,6 +304,62 @@ class ParseTree {
 
     public String save_tree() {
     	return this._save_tree(0, "");
+    }
+    
+	private int _getPosOfFirstAnychar(ParseTree pt, int counter) {
+		if(!pt.is_nt()) {
+			if(!anychar_seen_gpofa) {
+				counter++;
+			}
+		}
+		else if(pt.name.equals("<anychars>") || pt.name.equals("<anychar>") || pt.name.equals("<anycharsp>") || pt.name.equals("<anycharp>")) {
+			if(!anychar_seen_gpofa) {
+				setAnycharSeenTrue(this);
+			}
+			
+		}
+		for(ParseTree p : pt.children) {
+			counter = _getPosOfFirstAnychar(p, counter);
+		}
+		return counter;
+	}
+	
+	/*
+	 * Returns the length of the string BEFORE hitting a 
+	 * <anychar> rule in the tree
+	 * 
+	 * */
+	public int getPosOfFirstAnychar() {
+		return _getPosOfFirstAnychar(this, 0);
+	}
+	
+    private void setAnycharSeenTrue(ParseTree master) {
+    	master.anychar_seen_gpofa = true;
+		for(ParseTree pt : master.children) {
+			setAnycharSeenTrue(pt);
+		}
+		
+	}
+    public String print_tree_anychar_chars() {
+    	return this._print_tree_anychar_chars(this, "", null);
+    }
+    
+    /*
+     * Returns the char sequence of the non terminals of <anychar> trees
+     * 
+     * */
+    private String _print_tree_anychar_chars(ParseTree result, String tree, ParseTree parent) {
+    	if(!(result.is_nt())) {
+    		if(parent != null) {
+    			if(parent.name.equals("<anychars>") || parent.name.equals("<anychar>") || parent.name.equals("<anycharsp>") || parent.name.equals("<anycharp>")) {
+    				return result.name;
+    			}
+    		}
+    	}
+        for (ParseTree p : result.children) {
+        	tree += p._print_tree_anychar_chars(p, "", result);
+        }
+        return tree;
     }
 }
 
@@ -963,6 +1039,9 @@ public class ParserLib {
     	// Equivalent to parse_text but without reading from a file; just parsing the fuzzed input
 		// EarleyParser ep = new EarleyParser(this.grammar);
         Iterator<ParseTree> result = ep.parse(content);
+        while(result.hasNext()) {
+        	System.out.println(result.next());
+        }
         if (result.hasNext()) {
             return result.next();
         }

@@ -1,4 +1,5 @@
 package parser;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
@@ -57,7 +58,7 @@ public class Fuzzer {
 	private Grammar anychar_grammar;
 	private HashMap<String, ArrayList<ParsedStringSettings>> listForEasiestMod = new HashMap<String, ArrayList<ParsedStringSettings>>();
 	
-	private boolean log = false;
+	private boolean log = true;
 	private final int MAX_INPUT_LENGTH = 100; // Sets the maximal input length when creating a string
 	private HashSet<String> exclude_grammars = new HashSet<>(Arrays.asList("<anychar>", "<anychars>", "<anycharsp>", "<anycharp>"));
 	
@@ -104,37 +105,7 @@ public class Fuzzer {
 		 * */
 		int i = 0;
 		while (true) {
-			try {
-				if(this.log) {
-					System.out.println("\n\n------------New run------------");					
-				}
-				Date d_start = new Date();
-				if(this.log) {
-					System.out.println("Import ParserLib grammar");
-				}
-				this.setCurr_pl(new ParserLib(this.getGrammar()));
-				Date d_end = new Date();
-				long difference = d_end.getTime() - d_start.getTime();
-				if(this.log) {
-					System.out.println("ParserLib grammar successfully imported in " + difference / 1000 + " seconds");
-				}
-				d_start = new Date();
-				if(this.log) {
-					System.out.println("Create EarleyParser with ParserLib grammar");
-				}
-				this.setCurr_ep(new EarleyParser(this.getCurr_pl().grammar));
-				d_end = new Date();
-				difference = d_end.getTime() - d_start.getTime();
-				if(this.log) {
-					System.out.println("Successfully created EarleyParser with ParserLib grammar in " + difference / 1000 + " seconds");
-				}
-				// Set golden grammar ParserLib as well as EarleyParser
-				this.setGolden_grammar_PL(this.getCurr_pl());
-				this.setGolden_grammar_EP(this.getCurr_ep());
-			} catch (Exception e1) {
-				System.out.println("Something went wrong... " + e1.toString());
-				System.exit(1);
-			}
+			initializeGoldenGrammar();
 			String created_string = generate(log_level); // Generate a new valid JSON Object, according to org.json.JSONObject
 			if(created_string != null) {
 				// Check if the created string is also valid according to the "golden grammar"
@@ -143,7 +114,7 @@ public class Fuzzer {
 		        	// created_string = "{7w\f\b	:e	,A- 'm \f:y 	\b}";
 		        	created_string = "{\"abcd\": [{\"pqrs\":}]}";
 		        	// created_string = "\"abcd\"";
-		        	System.out.println("Created string [" + (i + 1) + "]: " + created_string);
+		        	System.out.println("\nCreated string [" + (i + 1) + "]: " + created_string);
 		            ParseTree result = this.getCurr_pl().parse_string(created_string, this.getCurr_ep()); // Try to parse the string
 		            this.getCurr_pl().show_tree(result);
 		            // this.setTree_key(this.getCurr_pl().save_tree(result, 0));
@@ -175,6 +146,40 @@ public class Fuzzer {
 	
 	
 	
+	private void initializeGoldenGrammar() {
+		try {
+			if(this.log) {
+				System.out.println("\n\n------------New run------------");					
+			}
+			Date d_start = new Date();
+//			if(this.log) {
+//				System.out.println("Import ParserLib grammar");
+//			}
+			this.setCurr_pl(new ParserLib(this.getGrammar()));
+			Date d_end = new Date();
+			long difference = d_end.getTime() - d_start.getTime();
+//			if(this.log) {
+//				System.out.println("ParserLib grammar successfully imported in " + difference / 1000 + " seconds");
+//			}
+			d_start = new Date();
+//			if(this.log) {
+//				System.out.println("Create EarleyParser with ParserLib grammar");
+//			}
+			this.setCurr_ep(new EarleyParser(this.getCurr_pl().grammar));
+			d_end = new Date();
+			difference = d_end.getTime() - d_start.getTime();
+//			if(this.log) {
+//				System.out.println("Successfully created EarleyParser with ParserLib grammar in " + difference / 1000 + " seconds");
+//			}
+			// Set golden grammar ParserLib as well as EarleyParser
+			this.setGolden_grammar_PL(this.getCurr_pl());
+			this.setGolden_grammar_EP(this.getCurr_ep());
+		} catch (Exception e1) {
+			System.out.println("Something went wrong... " + e1.toString());
+			System.exit(1);
+		}
+	}
+
 	private void determineEasiestModification(String created_string) {
 		ParsedStringSettings easiestMod = this.getListForEasiestMod().get(created_string).get(0);
 		for(ParsedStringSettings pss : this.getListForEasiestMod().get(created_string)) {
@@ -211,98 +216,36 @@ public class Fuzzer {
     			}
 				for(int elemC = 0; elemC < entry.getValue().get(gRuleC).size(); elemC++) {
 					try {
-            			// Load the original master grammar
-        	        	ParserLib pl_adjusted = null;
-        	    		EarleyParser ep_adjusted = null;
-        	    		Date d_start = new Date();
-        	    		if(this.log) {
-        	    			System.out.println("Import ParserLib grammar");
-        				}
-        				pl_adjusted = new ParserLib(grammar);
-        				Date d_end = new Date();
-        				long difference = d_end.getTime() - d_start.getTime();
-        				if(this.log) {
-        					System.out.println("ParserLib grammar successfully imported in " + difference / 1000 + " seconds");
-        				}
-        				
-        				// Replace the rule with <anychars>
-        				pl_adjusted.grammar.get(state).get(gRuleC).set(elemC, "<anychars>");
-        				if(this.log) {
-        					System.out.printf("Adjusted %s[%d][%d]: %s => %s\n", 
-        							state, gRuleC, elemC, master.get(state).get(gRuleC).get(elemC), pl_adjusted.grammar.get(state).get(gRuleC).get(elemC));
-            			}
-        				
-        				
-        				d_start = new Date();
-        				if(this.log) {
-        					System.out.println("Create EarleyParser with ParserLib grammar");
-        				}
-        				ep_adjusted = new EarleyParser(pl_adjusted.grammar);
-        				d_end = new Date();
-        				difference = d_end.getTime() - d_start.getTime();
-        				if(this.log) {
-        					System.out.println("Successfully created EarleyParser with ParserLib grammar in " + difference / 1000 + " seconds");
-        				}
-                		this.setCurr_pl(pl_adjusted);
-                		this.setCurr_ep(ep_adjusted);
-                		
-                		ParseTree result = this.getCurr_pl().parse_string(created_string, this.getCurr_ep()); // Try to parse the string
-                		if(this.log) {
-                			System.out.println("String " + created_string + " successfully parsed using the adjusted golden grammar");
-            			}
-        	            ParsedStringSettings pss = new ParsedStringSettings(
-        	            		created_string,
-        	            		result.count_nodes(0, this.getExclude_grammars()),
-        	            		result.count_leafes(),
-        	            		state, 
-        	            		entry.getValue().get(gRuleC), 
-        	            		entry.getValue().get(gRuleC).get(elemC), 
-        	            		result, 
-        	            		this.getCurr_pl());
-        	            // System.out.println(pss.toString());
-        	            HDD hdd = new HDD();
-        	            ParsedStringSettings minimal_input_for_rule = hdd.startHDD(pss, this.getExclude_grammars(), this.getGolden_grammar_PL(), this.getGolden_grammar_EP());
-        	            // System.out.println("Minimal input for " + created_string + ": " + minimal_input_for_rule);
-        	            if(minimal_input_for_rule != null) { // Could we minimize the input?
-        	            	ArrayList<ParsedStringSettings> pss_list = this.getListForEasiestMod().get(created_string);
-            	            if(pss_list != null) {
-            	            	if(!pss_list.contains(minimal_input_for_rule)) {
-            	            		this.getListForEasiestMod().get(created_string).add(minimal_input_for_rule);
-            	            	}
-            	            	else {
-            	            		if(this.log) {
-            	            			System.out.println("Already contains the same ParsedStringSettings");
-            	        			}
-            	            	}
-            	            }
-            	            else {
-            	            	ArrayList<ParsedStringSettings> tmp_pss_list = new ArrayList<ParsedStringSettings>();
-            	            	tmp_pss_list.add(minimal_input_for_rule);
-            	            	this.getListForEasiestMod().put(created_string, tmp_pss_list);
-            	            }
-        	            }
-        	            else { // We were not able to minimize the input and thus keep the original settings
-        	            	ArrayList<ParsedStringSettings> pss_list = this.getListForEasiestMod().get(created_string);
-            	            if(pss_list != null) {
-            	            	if(!pss_list.contains(pss)) {
-            	            		this.getListForEasiestMod().get(created_string).add(pss);
-            	            	}
-            	            	else {
-            	            		if(this.log) {
-            	            			System.out.println("Already contains the same ParsedStringSettings");
-            	        			}
-            	            	}
-            	            }
-            	            else {
-            	            	ArrayList<ParsedStringSettings> tmp_pss_list = new ArrayList<ParsedStringSettings>();
-            	            	tmp_pss_list.add(pss);
-            	            	this.getListForEasiestMod().put(created_string, tmp_pss_list);
-            	            }
-        	            }
+                		ParseTree result = checkAdjustedGrammar(state, master, gRuleC, elemC, created_string);
+                		// ParseTree result = this.getCurr_pl().parse_string(created_string, this.getCurr_ep()); // Try to parse the string
+                		if(result != null) {
+                			ParsedStringSettings pss = identifiyAndRemoveAnycharChars(result, created_string, state, master, gRuleC, elemC, entry, null);
+                			if(pss != null) {
+                				// System.out.println(pss.toString());
+                	            HDD hdd = new HDD();
+                	            ParsedStringSettings minimal_input_for_rule = hdd.startHDD(pss, this.getExclude_grammars(), this.getGolden_grammar_PL(), this.getGolden_grammar_EP());
+                	            if(this.log) {
+                	            	System.out.println("\n\nFinished HDD. Result:\n" + minimal_input_for_rule.toString());
+                	            }
+                	            // System.out.println("Minimal input for " + created_string + ": " + minimal_input_for_rule);
+                	            // 
+                	            if(minimal_input_for_rule != null) {
+                    	            addMinimalInputToList(minimal_input_for_rule, created_string, pss);
+                	            }
+                			}
+                     		else {
+                    			if(this.log) {
+                    				System.out.println("Continue with the adjustment of the next rule");
+                    			}
+                    		}
+                		}
+                		else {
+                			if(this.log) {
+                				System.out.println("Continue with the adjustment of the next rule");
+                			}
+                		}
     				} catch (Exception e) {
-    					if(this.log) {
-    						System.out.println(e.toString());
-    	    			}
+    					
     				}
 				}
 			}
@@ -311,97 +254,41 @@ public class Fuzzer {
 			GRule anycharsp = new GRule();
 			anycharsp.add("<anycharsp>");
 			if(this.log) {
-				System.out.println("Add <anycharsp> to " + state);
+				System.out.println("\nAdd <anycharsp> to the set of rules of " + state);
 			}
 			try {
-				// Load the original master grammar
-	        	ParserLib pl_adjusted = null;
-	    		EarleyParser ep_adjusted = null;
-	    		Date d_start = new Date();
-	    		if(this.log) {
-	    			System.out.println("Import ParserLib grammar");
+				if(state.equals("<string>")) {
+					System.out.println("");
 				}
-				pl_adjusted = new ParserLib(grammar);
-				Date d_end = new Date();
-				long difference = d_end.getTime() - d_start.getTime();
-				if(this.log) {
-					System.out.println("ParserLib grammar successfully imported in " + difference / 1000 + " seconds");
-				}
-				
-				// Replace the rule with <anychars>
-				pl_adjusted.grammar.get(state).add(anycharsp);
-				// rule_set.add(anycharsp.get(0));
-				
-				d_start = new Date();
-				if(this.log) {
-					System.out.println("Create EarleyParser with ParserLib grammar");
-				}
-				ep_adjusted = new EarleyParser(pl_adjusted.grammar);
-				d_end = new Date();
-				difference = d_end.getTime() - d_start.getTime();
-				if(this.log) {
-					System.out.println("Successfully created EarleyParser with ParserLib grammar in " + difference / 1000 + " seconds");
-				}
-        		this.setCurr_pl(pl_adjusted);
-        		this.setCurr_ep(ep_adjusted);
-        		
-        		ParseTree result = this.getCurr_pl().parse_string(created_string, this.getCurr_ep()); // Try to parse the string
-        		if(this.log) {
-        			System.out.println("String " + created_string + " successfully parsed using the adjusted golden grammar");
-    			}
-	            ParsedStringSettings pss = new ParsedStringSettings(
-	            		created_string,
-	            		result.count_nodes(0, this.getExclude_grammars()), 
-	            		result.count_leafes(),
-	            		state, 
-	            		null, 
-	            		"ADDED RULE <ANYCHARSP>", 
-	            		result, 
-	            		this.getCurr_pl());
-	            // System.out.println(pss.toString());
-	            HDD hdd = new HDD();
-	            ParsedStringSettings minimal_input_for_rule = hdd.startHDD(pss, this.getExclude_grammars(), this.getGolden_grammar_PL(), this.getGolden_grammar_EP());
-	            // System.out.println(minimal_input_for_rule.toString());
-	            if(minimal_input_for_rule != null) {
-	            	ArrayList<ParsedStringSettings> pss_list = this.getListForEasiestMod().get(created_string);
-	            	if(pss_list != null) {
-		            	if(!pss_list.contains(minimal_input_for_rule)) {
-		            		this.getListForEasiestMod().get(created_string).add(minimal_input_for_rule);
-		            	}
-		            	else {
-		            		if(this.log) {
-		            			System.out.println("Already contains the same ParsedStringSettings");
-		        			}
-		            	}
-		            }
-		            else {
-		            	ArrayList<ParsedStringSettings> tmp_pss_list = new ArrayList<ParsedStringSettings>();
-		            	tmp_pss_list.add(minimal_input_for_rule);
-		            	this.getListForEasiestMod().put(created_string, tmp_pss_list);
-		            }
-	            }
-	            else { // We were not able to minimize the input and thus keep the original settings
-	            	ArrayList<ParsedStringSettings> pss_list = this.getListForEasiestMod().get(created_string);
-    	            if(pss_list != null) {
-    	            	if(!pss_list.contains(pss)) {
-    	            		this.getListForEasiestMod().get(created_string).add(pss);
-    	            	}
-    	            	else {
-    	            		if(this.log) {
-    	            			System.out.println("Already contains the same ParsedStringSettings");
-    	        			}
-    	            	}
-    	            }
-    	            else {
-    	            	ArrayList<ParsedStringSettings> tmp_pss_list = new ArrayList<ParsedStringSettings>();
-    	            	tmp_pss_list.add(pss);
-    	            	this.getListForEasiestMod().put(created_string, tmp_pss_list);
-    	            }
-	            }
+        		ParseTree result = checkAdjustedGrammar(state, created_string, anycharsp);
+        		if(result != null) {
+        			// ParseTree result = this.getCurr_pl().parse_string(created_string, this.getCurr_ep()); // Try to parse the string
+            		ParsedStringSettings pss = identifiyAndRemoveAnycharChars(result, created_string, state, master, -1, -1, entry, anycharsp);
+            		if(pss != null) {
+        	            // System.out.println(pss.toString());
+        	            HDD hdd = new HDD();
+        	            ParsedStringSettings minimal_input_for_rule = hdd.startHDD(pss, this.getExclude_grammars(), this.getGolden_grammar_PL(), this.getGolden_grammar_EP());
+        	            if(this.log) {
+        	            	System.out.println("\n\nFinished HDD. Result:\n" + minimal_input_for_rule.toString());
+        	            }
+        	            if(minimal_input_for_rule != null) {
+            	            addMinimalInputToList(minimal_input_for_rule, created_string, pss);
+        	            }
+        	            
+            		}
+            		else {
+            			if(this.log) {
+            				System.out.println("Continue with the adjustment of the next rule");
+            			}
+            		}
+        		}
+         		else {
+        			if(this.log) {
+        				System.out.println("Continue with the adjustment of the next rule");
+        			}
+        		}
 			} catch (Exception e) {
-				if(this.log) {
-					System.out.println(e.toString());
-    			}
+				
 			}
     		
     	}
@@ -419,83 +306,229 @@ public class Fuzzer {
     	}
     	System.exit(0);
 	}
-
-	private ArrayList<GRule> getRulesFromEntry(HashMap<String, GDef> master, String key) {
-		ArrayList<GRule> result = new ArrayList<GRule>();
-		try {
-			for(GRule rule : master.get(key)) {
-				// For each rule, check if the rule is a non terminal rule (i.e. not ":", etc.)
-				String str_rule = rule.toString();
-				if(str_rule.length() > 2) {
-					str_rule = str_rule.replace("[", "");
-					str_rule = str_rule.replace("]", "");
-				}
-				else {
-					continue;
-				}
-				System.out.println(str_rule);
-				if(master.containsKey(str_rule)) {
-					result.add(rule);
-					System.out.println("Added rule " + str_rule);
-				}
-			}
-
-		} catch (Exception e) {
-			System.out.println("Exception " + e + " at getRuleFromEntry()");
-		}
-		return result;
+	
+	private void addMinimalInputToList(ParsedStringSettings minimal_input_for_rule, String created_string, ParsedStringSettings pss) {
+		if(minimal_input_for_rule != null) {
+        	ArrayList<ParsedStringSettings> pss_list = this.getListForEasiestMod().get(created_string);
+        	if(pss_list != null) {
+            	if(!pss_list.contains(minimal_input_for_rule)) {
+            		this.getListForEasiestMod().get(created_string).add(minimal_input_for_rule);
+            	}
+            	else {
+            		if(this.log) {
+            			System.out.println("Already contains the same ParsedStringSettings");
+        			}
+            	}
+            }
+            else {
+            	ArrayList<ParsedStringSettings> tmp_pss_list = new ArrayList<ParsedStringSettings>();
+            	tmp_pss_list.add(minimal_input_for_rule);
+            	this.getListForEasiestMod().put(created_string, tmp_pss_list);
+            }
+        }
+        else { // We were not able to minimize the input and thus keep the original settings
+        	ArrayList<ParsedStringSettings> pss_list = this.getListForEasiestMod().get(created_string);
+            if(pss_list != null) {
+            	if(!pss_list.contains(pss)) {
+            		this.getListForEasiestMod().get(created_string).add(pss);
+            	}
+            	else {
+            		if(this.log) {
+            			System.out.println("Already contains the same ParsedStringSettings");
+        			}
+            	}
+            }
+            else {
+            	ArrayList<ParsedStringSettings> tmp_pss_list = new ArrayList<ParsedStringSettings>();
+            	tmp_pss_list.add(pss);
+            	this.getListForEasiestMod().put(created_string, tmp_pss_list);
+            }
+        }
 	}
 
-	public String hdd() {
-		int level = 0;
+	/*
+	 * Checks the adjusted Grammar for adding <anycharsp>
+	 * Returns a ParseTree if the string could be parsed successfully
+	 * Otherwise null
+	 * */
+	private ParseTree checkAdjustedGrammar(String state, String created_string, GRule anycharsp) {
+		try {
+			// Load the original master grammar
+        	ParserLib pl_adjusted = null;
+    		EarleyParser ep_adjusted = null;
+    		Date d_start = new Date();
+//    		if(this.log) {
+//    			System.out.println("Import ParserLib grammar");
+//			}
+			pl_adjusted = new ParserLib(grammar);
+			Date d_end = new Date();
+			long difference = d_end.getTime() - d_start.getTime();
+//			if(this.log) {
+//				System.out.println("ParserLib grammar successfully imported in " + difference / 1000 + " seconds");
+//			}
+			
+			// Replace the rule with <anychars>
+			pl_adjusted.grammar.get(state).add(anycharsp);
+			
+			d_start = new Date();
+//			if(this.log) {
+//				System.out.println("Create EarleyParser with ParserLib grammar");
+//			}
+			ep_adjusted = new EarleyParser(pl_adjusted.grammar);
+			d_end = new Date();
+			difference = d_end.getTime() - d_start.getTime();
+    		this.setCurr_pl(pl_adjusted);
+    		this.setCurr_ep(ep_adjusted);
+			ParseTree pt = this.getCurr_pl().parse_string(created_string, this.getCurr_ep());
+    		if(this.log) {
+    			System.out.println("String " + created_string + " successfully parsed using the adjusted golden grammar");
+			}
+			return pt;
+		} catch (Exception e) {
+  			if(this.log) {
+				System.out.println("Failed to parse the string using the adjusted grammar");
+			}
+			return null;
+		}
+	}
+
+	/*
+	 * Checks the adjusted Grammar
+	 * Returns a ParseTree if the string could be parsed successfully
+	 * Otherwise null
+	 * */
+	private ParseTree checkAdjustedGrammar(String state, HashMap<String, GDef> master, int gRuleC, int elemC, String created_string) {
+		try {
+			ParserLib pl_adjusted = null;
+			EarleyParser ep_adjusted = null;
+			Date d_start = new Date();
+//			if(this.log) {
+//				System.out.println("Import ParserLib grammar");
+//			}
+			pl_adjusted = new ParserLib(grammar);
+			Date d_end = new Date();
+			long difference = d_end.getTime() - d_start.getTime();
+//			if(this.log) {
+//				System.out.println("ParserLib grammar successfully imported in " + difference / 1000 + " seconds");
+//			}
+			
+			// Replace the rule with <anychars>
+			pl_adjusted.grammar.get(state).get(gRuleC).set(elemC, "<anychars>");
+			if(this.log) {
+				System.out.printf("Adjusted %s[%d][%d]: %s => %s\n", 
+						state, gRuleC, elemC, master.get(state).get(gRuleC).get(elemC), pl_adjusted.grammar.get(state).get(gRuleC).get(elemC));
+			}
+			
+			
+			d_start = new Date();
+//			if(this.log) {
+//				System.out.println("Create EarleyParser with ParserLib grammar");
+//			}
+			ep_adjusted = new EarleyParser(pl_adjusted.grammar);
+			d_end = new Date();
+			difference = d_end.getTime() - d_start.getTime();
+			this.setCurr_pl(pl_adjusted);
+			this.setCurr_ep(ep_adjusted);
+			ParseTree pt = this.getCurr_pl().parse_string(created_string, this.getCurr_ep());
+    		if(this.log) {
+    			System.out.println("String " + created_string + " successfully parsed using the adjusted golden grammar");
+			}
+			return pt;
+		} catch (Exception e) {
+  			if(this.log) {
+				System.out.println("Failed to parse the string using the adjusted grammar");
+			}
+			return null;
+		}
+	
+	}
+
+	/*
+	 * Given a ParseTree, this method will identify and remove the
+	 * <anychar/s/p> characters within the string. The thus minimized 
+	 * string will then be checked again (can we still parse the string
+	 * using the adjusted grammar rule?). 
+	 * Returns: A new minimized ParseTree
+	 * 
+	 * */
+	private ParsedStringSettings identifiyAndRemoveAnycharChars(ParseTree result, String created_string, String state, HashMap<String, GDef> master, int gRuleC, int elemC, Entry<String, GDef> entry, GRule anycharsp) {
+		StringBuilder sb_created_string = new StringBuilder(created_string);
+		String anychars = result.print_tree_anychar_chars(); // Returns a sequence of characters that should been removed from created_string
+		int anychars_length = anychars.length();
+		int pos = result.getPosOfFirstAnychar(); // Returns the position at which the sequence starts (to avoid collisions with multiple occurrences)
+		if(this.log) {
+			System.out.println(String.format("String representing through <anychar>: %s\nAnychar string starting at position: %d\nTree:\n%s", anychars, pos, result.save_tree()));
+		}
+		if(created_string.regionMatches(pos, anychars, 0, anychars.length())) {
+			// sb_created_string.delete(pos, anychars.length() + 1);
+			for(int i = 0; i < anychars_length; i++) { // Can not use normal delete as there a strange behavior when start = end (then nothing will be deleted)
+				sb_created_string.deleteCharAt(pos); // Delete the character at position POS anychars_length-times
+			}
+			if(this.log) {
+				if(anychars.equals("")) {
+					System.out.println(String.format("Removed nothing from the string as the anychar part is "
+							+ "representing the empty string. String remains: %s", sb_created_string));
+				}
+				else {
+					System.out.println(String.format("Removed %s from %s => %s", anychars, created_string, sb_created_string));
+				}
+			}
+			// Check if the string without anychar-chars will be rejected by the golden grammar and accepted by the adjusted golden grammar
+			// Differentiate between anychar and anycharsp (gRuleC and elemC = -1)
+			if(!(gRuleC == -1 && elemC == -1)) {
+				ParseTree pt = checkAdjustedGrammar(state, master, gRuleC, elemC, sb_created_string.toString());
+				if(!checkGoldenGrammar(sb_created_string.toString()) &&  pt != null) {
+		            ParsedStringSettings pss = new ParsedStringSettings(
+		            		sb_created_string.toString(),
+		            		pt.count_nodes(0, this.getExclude_grammars()),
+		            		pt.count_leafes(),
+		            		state, 
+		            		entry.getValue().get(gRuleC), 
+		            		entry.getValue().get(gRuleC).get(elemC), 
+		            		pt, 
+		            		this.getCurr_pl());
+		            return pss;
+				}
+			}
+			else { // <Anycharsp>
+				ParseTree pt = checkAdjustedGrammar(state, created_string, anycharsp);;
+				if(!checkGoldenGrammar(sb_created_string.toString()) &&  pt != null) {
+		            ParsedStringSettings pss = new ParsedStringSettings(
+		            		sb_created_string.toString(),
+		            		pt.count_nodes(0, this.getExclude_grammars()),
+		            		pt.count_leafes(),
+		            		state, 
+		            		null, 
+		            		"ADDED RULE <ANYCHARSP>", 
+		            		pt, 
+		            		this.getCurr_pl());
+		            return pss;
+				}
+			}
+		}
 		return null;
 	}
 	
-	private ArrayList<String> getStatesFromColumn(Column c, Grammar g) {
-		ArrayList<String> result = new ArrayList<String>();
-		String col = c.toString();
-		// col = col.replace("\n", ""); // Remove \n
-		// col = col.replace("|", "");
-		// col = col.replaceAll("[\\d]", "");
-		col = col.replaceAll("chart", "");
-		String[] colRow = col.split("\n");
-		for (int i = colRow.length; i > 0; i--) {
-			if(colRow[i-1].contains("<") && colRow[i-1].contains(">")) {
-			// if(containsMult(colRow[i-1], "<", 1)) { // Make sure that there is at least one state on the "right" site
-				// TODO optimize; both for loops are actually not necessary
-				ArrayList<String> colRowContent = new ArrayList<String>();
-				String[] tmpList = colRow[i-1].split(":=")[0].split(" ");
-				for (String elem : tmpList) {
-					colRowContent.add(elem);
-				}
-				tmpList = colRow[i-1].split(":=")[1].split(" ");
-				for (String elem : tmpList) {
-					if(!colRowContent.contains(elem)) {
-						colRowContent.add(elem);
-					}
-				}
-				for (int j = 0; j < colRowContent.size(); j++) {
-					// System.out.println(colRowContent[j]);
-					if (g.containsKey(colRowContent.get(j)) && !already_adjusted.contains(colRowContent.get(j))) { // 
-						result.add(colRowContent.get(j));
-						already_adjusted.add(colRowContent.get(j));
-					}
-				}
-				String line = colRow[i-1].split(":=")[1];
+	/*
+	 * Checks if the given string could be parsed using the golden grammar
+	 * Returns true if the string was parsed successfully
+	 * Otherwise returns false
+	 * */
+	private boolean checkGoldenGrammar(String adjusted_string) {
+		try {
+			ParseTree result = this.getGolden_grammar_PL().parse_string(adjusted_string, this.getGolden_grammar_EP());
+			if(this.log) {
+				System.out.println("String " + adjusted_string + " successfully parsed using the golden grammar...");
 			}
-			
+			return true;
+		} catch (Exception e) {
+			if(this.log) {
+				System.out.println("Golden grammar failed to parse " + adjusted_string + " successfully");
+			}
+			return false;
 		}
-		return result;
 	}
-	public boolean containsMult(String source, String regex, int x) {
-		int counter = 0;
-		for (char c : source.toCharArray()) {
-			String s = String.valueOf(c);
-			counter = s.equals(regex) ? counter += 1 : counter;
-		}
-		return counter > x;
-	}
-	
+
 	private String generate(boolean log_level) {
 		/*
 		 * Feed it one character at a time, and see if the parser rejects it. 
