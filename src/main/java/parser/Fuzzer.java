@@ -216,6 +216,9 @@ public class Fuzzer {
     			}
 				for(int elemC = 0; elemC < entry.getValue().get(gRuleC).size(); elemC++) {
 					try {
+						if(state.equals("<sp1>")) {
+							System.out.println("");
+						}
                 		ParseTree result = checkAdjustedGrammar(state, master, gRuleC, elemC, created_string);
                 		// ParseTree result = this.getCurr_pl().parse_string(created_string, this.getCurr_ep()); // Try to parse the string
                 		if(result != null) {
@@ -369,6 +372,9 @@ public class Fuzzer {
 			
 			// Replace the rule with <anychars>
 			pl_adjusted.grammar.get(state).add(anycharsp);
+			if(this.log) {
+				System.out.printf("Added <anycharsp> to %s\n", state);
+			}
 			
 			d_start = new Date();
 //			if(this.log) {

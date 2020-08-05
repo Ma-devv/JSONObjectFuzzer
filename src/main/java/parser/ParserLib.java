@@ -1039,9 +1039,6 @@ public class ParserLib {
     	// Equivalent to parse_text but without reading from a file; just parsing the fuzzed input
 		// EarleyParser ep = new EarleyParser(this.grammar);
         Iterator<ParseTree> result = ep.parse(content);
-        while(result.hasNext()) {
-        	System.out.println(result.next());
-        }
         if (result.hasNext()) {
             return result.next();
         }
