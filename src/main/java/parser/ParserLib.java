@@ -191,20 +191,38 @@ class ParseTree {
     public boolean is_nt() {
     	return (this.name.charAt(0) == '<' && this.name.charAt(this.name.length() - 1) == '>');
     }
-    public String tree_to_string() {
-    	return this._tree_to_string(this, "");
+    public String getTerminals() {
+    	return this._getTerminals(this, "");
     }
     
     /*
-     * Returns the name/value of the non terminals
+     * Returns the value of the terminals
      * 
      * */
-    private String _tree_to_string(ParseTree result, String tree) {
+    private String _getTerminals(ParseTree result, String tree) {
     	if(!(result.is_nt())) {
     		return result.name;
     	}
         for (ParseTree p : result.children) {
-        	tree += p._tree_to_string(p, "");
+        	tree += p._getTerminals(p, "");
+        }
+        return tree;
+    }
+    
+    public String getParentOfTerminals() {
+    	return this._getParentOfTerminals(this, "");
+    }
+    
+    /*
+     * Returns the value of the terminals
+     * 
+     * */
+    private String _getParentOfTerminals(ParseTree result, String tree) {
+        for (ParseTree p : result.children) {
+        	if(!p.is_nt()) {
+        		tree += result.name + ", ";
+        	}
+        	tree += p._getParentOfTerminals(p, "");
         }
         return tree;
     }
@@ -296,16 +314,16 @@ class ParseTree {
     	}
     	return result;
     }
-    private String _save_tree(int indent, String tree) {
+    private String _tree_to_string(int indent, String tree) {
     	tree += "   ".repeat(indent) + this.name;
         for (ParseTree p : this.children) {
-            tree = p._save_tree(indent + 1, tree + "\n");
+            tree = p._tree_to_string(indent + 1, tree + "\n");
         }
         return tree;
     }
 
-    public String save_tree() {
-    	return this._save_tree(0, "");
+    public String tree_to_string() {
+    	return this._tree_to_string(0, "");
     }
     
 	private int _getPosOfFirstAnychar(ParseTree pt, int counter) {
@@ -430,7 +448,7 @@ class ParseTree {
 	 * 
 	 * */
 	public HashMap<Integer, Integer> getMapOfPosStringAnychar() {
-		System.out.println(this.save_tree());
+		System.out.println(this.tree_to_string());
 		HashMap<Integer, Integer> result = new HashMap<Integer, Integer>();
 		int amount_of_seen_anychar = 0;
 		HashMap<Integer, Integer> pos_length_mapping = _getMapOfPosStringAnychar(this, null, amount_of_seen_anychar);
@@ -502,6 +520,7 @@ class ParseForest implements Iterable<ParseTree> {
 interface ParserI {
     ParseForest parse_prefix(String text, String start_symbol);
     ArrayList<ParseTree> parse(String text, String start_symbol) throws ParseException;
+    Iterator<ParseTree> parse_check(String text, String start_symbol) throws ParseException;
 }
 
 abstract class Parser implements ParserI {
@@ -527,6 +546,10 @@ abstract class Parser implements ParserI {
     public ArrayList<ParseTree> parse(String text) throws ParseException {
         return this.parse(text, this.start_symbol);
     }
+    public Iterator<ParseTree> parse_check(String text) throws ParseException {
+        return this.parse_check(text, this.start_symbol);
+    }
+    
 }
 
 class Item {
@@ -901,13 +924,13 @@ class EarleyParser extends Parser {
         }
         HashSet<String> h_pt = new HashSet<String>();
         for(int i = 0; i < forest.paths.size(); i++) {
-        	for(int j = 0; j < 10; j++) {
+        	for(int j = 0; j < 20; j++) {
         		// For loop to randomize the path traversal - Hotfix for the time being
         		ParseTree tmp = this.extract_a_tree(forest, i);
-        		if(!h_pt.contains(tmp.save_tree())) {
-        			h_pt.add(tmp.save_tree());
+        		if(!h_pt.contains(tmp.tree_to_string())) {
+        			h_pt.add(tmp.tree_to_string());
         			pt.add(tmp);
-        			System.out.println("Nr " + h_pt.size() + ":\n" + tmp.save_tree());
+        			System.out.println("Nr " + h_pt.size() + ":\n" + tmp.tree_to_string());
         		}
         	}
         }
@@ -915,6 +938,27 @@ class EarleyParser extends Parser {
         	System.out.println("");
         }
         return pt;
+    }
+    
+    ParseTree extract_a_tree_check(NamedForest forest_node) {
+        if (forest_node.paths.isEmpty()) {
+            return new ParseTree(forest_node.name, new ArrayList<ParseTree>());
+        }
+
+        ArrayList<ParseTree> lst = new ArrayList<ParseTree>();
+
+		for (TPath p : forest_node.paths.get(0)) {
+            lst.add(this.extract_a_tree_check(this.forest(p.sk.s, p.sk.k, p.chart)));
+        }
+        //[self.extract_a_tree(self.forest(*p)) for p in paths[0]]
+        return new ParseTree(forest_node.name, lst);
+    }
+
+
+    Iterator<ParseTree> extract_trees_check(NamedForest forest) {
+        ArrayList<ParseTree> pt = new ArrayList<ParseTree>();
+        pt.add(this.extract_a_tree_check(forest));
+        return pt.iterator();
     }
     
     /*
@@ -959,6 +1003,23 @@ class EarleyParser extends Parser {
         NamedForest forest = this.parse_forest(this.table, start);
         return this.extract_trees(forest);
     }
+    
+    public Iterator<ParseTree> parse_check(String text,String start_symbol) throws ParseException {
+    ParseForest p = this.parse_prefix(text, start_symbol);
+    State start = null;
+    for (State s : p.states) {
+        if (s.finished()) {
+            start = s;
+        }
+    }
+    if (p.cursor < text.length() || (start == null)) {
+    	// NamedForest forest = this.parse_forest(this.table, start);
+        throw new ParseException("at " + p.cursor);
+    }
+    
+    NamedForest forest = this.parse_forest(this.table, start);
+    return this.extract_trees_check(forest);
+}
 /*
     def extract_trees(self, forest_node):
         name, paths = forest_node
@@ -1185,6 +1246,15 @@ public class ParserLib {
 		// EarleyParser ep = new EarleyParser(this.grammar);
         ArrayList<ParseTree> result = ep.parse(content);
         return result;
+    }
+    
+    public ParseTree check_string(String content, EarleyParser ep) throws ParseException, IOException {
+    	// Equivalent to parse_text but without reading from a file; just parsing the fuzzed input
+        Iterator<ParseTree> result = ep.parse_check(content);
+        if (result.hasNext()) {
+            return result.next();
+        }
+        return null;
     }
 
 }
