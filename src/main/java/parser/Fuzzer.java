@@ -2,6 +2,7 @@ package parser;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -9,6 +10,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.SortedSet;
+import java.util.TreeMap;
 import java.util.concurrent.ThreadLocalRandom;
 import org.json.JSONObject;
 
@@ -115,11 +118,23 @@ public class Fuzzer {
 		        	created_string = "{\"abcd\": [{\"pqrs\":}]}";
 		        	// created_string = "\"abcd\"";
 		        	System.out.println("\nCreated string [" + (i + 1) + "]: " + created_string);
-		            ParseTree result = this.getCurr_pl().parse_string(created_string, this.getCurr_ep()); // Try to parse the string
-		            this.getCurr_pl().show_tree(result);
+	        		for(ParseTree pt : this.getCurr_pl().parse_string(created_string, this.getCurr_ep())) {
+	        			if(pt != null) {
+	        				// Parsed successfully using the golden grammar
+	        				// There is no need to loop over the rest of the loop as we have one valid result
+	        				if(this.log) {
+	        					System.out.println("String " + created_string + " successfully parsed using the original golden grammar... Continuing");
+	        					System.out.println("Tree: \n");
+	        					this.getCurr_pl().show_tree(pt);
+	        				}
+	        				// Break and generate a new string
+	        				break;
+	        			}
+	        		}
+		            // ParseTree result = this.getCurr_pl().parse_string(created_string, this.getCurr_ep()); // Try to parse the string
+		            // this.getCurr_pl().show_tree(result);
 		            // this.setTree_key(this.getCurr_pl().save_tree(result, 0));
-		            // The string has been parsed successfully and thus we just continue... 
-		            System.out.println("String " + created_string + " successfully parsed using the original golden grammar... Continuing");
+		            // The string has been parsed successfully and thus we just continue...
 		            // System.exit(0);
 		        } catch (Exception e) { 
 		        	// The string has not been parsed successfully
@@ -208,8 +223,6 @@ public class Fuzzer {
     			}
     			continue;
     		}
-    		// ArrayList<GRule> rules = getRulesFromEntry(master, state);
-    		
     		for (int gRuleC = 0; gRuleC < entry.getValue().size(); gRuleC++) {
     			if(this.log) {
     				System.out.println("\nRule: " + entry.getValue().get(gRuleC).toString() + ", Size: " + entry.getValue().get(gRuleC).size());    				
@@ -219,35 +232,46 @@ public class Fuzzer {
 						if(state.equals("<sp1>")) {
 							System.out.println("");
 						}
-                		ParseTree result = checkAdjustedGrammar(state, master, gRuleC, elemC, created_string);
+                		ArrayList<ParseTree> result_lst = successfullyParserUsingAdjustedGrammar(state, master, gRuleC, elemC, created_string);
                 		// ParseTree result = this.getCurr_pl().parse_string(created_string, this.getCurr_ep()); // Try to parse the string
-                		if(result != null) {
-                			ParsedStringSettings pss = identifiyAndRemoveAnycharChars(result, created_string, state, master, gRuleC, elemC, entry, null);
-                			if(pss != null) {
-                				// System.out.println(pss.toString());
-                	            HDD hdd = new HDD();
-                	            ParsedStringSettings minimal_input_for_rule = hdd.startHDD(pss, this.getExclude_grammars(), this.getGolden_grammar_PL(), this.getGolden_grammar_EP());
-                	            if(this.log) {
-                	            	System.out.println("\n\nFinished HDD. Result:\n" + minimal_input_for_rule.toString());
-                	            }
-                	            // System.out.println("Minimal input for " + created_string + ": " + minimal_input_for_rule);
-                	            // 
-                	            if(minimal_input_for_rule != null) {
-                    	            addMinimalInputToList(minimal_input_for_rule, created_string, pss);
-                	            }
-                			}
-                     		else {
-                    			if(this.log) {
-                    				System.out.println("Continue with the adjustment of the next rule");
-                    			}
+                		if(result_lst != null) {
+                    		for(ParseTree result : result_lst) {
+                        		if(result != null) {
+                        			ArrayList<ParsedStringSettings> pss_lst = identifiyAndRemoveAnycharChars(result, created_string, state, master, gRuleC, elemC, entry, null);
+                        			if(pss_lst != null) {
+                        				for(ParsedStringSettings pss : pss_lst) {
+                            				if(pss != null) {
+                                				// System.out.println(pss.toString());
+                                	            HDD hdd = new HDD();
+                                	            ParsedStringSettings minimal_input_for_rule = hdd.startHDD(pss, this.getExclude_grammars(), this.getGolden_grammar_PL(), this.getGolden_grammar_EP());
+                                	            // System.out.println("Minimal input for " + created_string + ": " + minimal_input_for_rule);
+                                	            // 
+                                	            if(minimal_input_for_rule != null) {
+                                	            	if(this.log) {
+                                    	            	System.out.println("\n\nFinished HDD. Result:\n" + minimal_input_for_rule.toString());
+                                    	            }
+                                    	            addMinimalInputToList(minimal_input_for_rule, created_string, pss);
+                                	            }
+                                			}
+                                     		else {
+                                    			if(this.log) {
+                                    				System.out.println("Continue with the next returned ParseTree or with the adjustment of the next rule");
+                                    			}
+                                    		}
+                            			}
+                        			}
+                        		}
+                        		else {
+                        			if(this.log) {
+                        				System.out.println("Continue with the next returned ParseTree or with the adjustment of the next rule");
+                        			}
+                        		}
                     		}
                 		}
-                		else {
-                			if(this.log) {
-                				System.out.println("Continue with the adjustment of the next rule");
-                			}
-                		}
     				} catch (Exception e) {
+    					if(this.log) {
+    						System.out.println("change_everything_except_anychar_one_after_another: " + e.toString());
+    					}
     					
     				}
 				}
@@ -263,32 +287,39 @@ public class Fuzzer {
 				if(state.equals("<string>")) {
 					System.out.println("");
 				}
-        		ParseTree result = checkAdjustedGrammar(state, created_string, anycharsp);
-        		if(result != null) {
-        			// ParseTree result = this.getCurr_pl().parse_string(created_string, this.getCurr_ep()); // Try to parse the string
-            		ParsedStringSettings pss = identifiyAndRemoveAnycharChars(result, created_string, state, master, -1, -1, entry, anycharsp);
-            		if(pss != null) {
-        	            // System.out.println(pss.toString());
-        	            HDD hdd = new HDD();
-        	            ParsedStringSettings minimal_input_for_rule = hdd.startHDD(pss, this.getExclude_grammars(), this.getGolden_grammar_PL(), this.getGolden_grammar_EP());
-        	            if(this.log) {
-        	            	System.out.println("\n\nFinished HDD. Result:\n" + minimal_input_for_rule.toString());
-        	            }
-        	            if(minimal_input_for_rule != null) {
-            	            addMinimalInputToList(minimal_input_for_rule, created_string, pss);
-        	            }
-        	            
+        		ArrayList<ParseTree> result_lst = successfullyParserUsingAdjustedGrammar(state, created_string, anycharsp);
+        		if(result_lst != null) {
+            		for(ParseTree result : result_lst) {
+            			if(result != null) {
+                			// ParseTree result = this.getCurr_pl().parse_string(created_string, this.getCurr_ep()); // Try to parse the string
+                    		ArrayList<ParsedStringSettings> pss_lst = identifiyAndRemoveAnycharChars(result, created_string, state, master, -1, -1, entry, anycharsp);
+                    		if(pss_lst != null) {
+                    			for(ParsedStringSettings pss : pss_lst) {
+                        			if(pss != null) {
+                        	            // System.out.println(pss.toString());
+                        	            HDD hdd = new HDD();
+                        	            ParsedStringSettings minimal_input_for_rule = hdd.startHDD(pss, this.getExclude_grammars(), this.getGolden_grammar_PL(), this.getGolden_grammar_EP());
+                        	            if(minimal_input_for_rule != null) {
+                        	            	if(this.log) {
+                            	            	System.out.println("\n\nFinished HDD. Result:\n" + minimal_input_for_rule.toString());
+                            	            }
+                            	            addMinimalInputToList(minimal_input_for_rule, created_string, pss);
+                        	            }
+                            		}
+                            		else {
+                            			if(this.log) {
+                            				System.out.println("Continue with the next returned ParseTree or with the adjustment of the next rule");
+                            			}
+                            		}
+                        		}
+                    		}
+                		}
+                 		else {
+                			if(this.log) {
+                				System.out.println("Continue with the next returned ParseTree or with the adjustment of the next rule");
+                			}
+                		}
             		}
-            		else {
-            			if(this.log) {
-            				System.out.println("Continue with the adjustment of the next rule");
-            			}
-            		}
-        		}
-         		else {
-        			if(this.log) {
-        				System.out.println("Continue with the adjustment of the next rule");
-        			}
         		}
 			} catch (Exception e) {
 				
@@ -354,7 +385,8 @@ public class Fuzzer {
 	 * Returns a ParseTree if the string could be parsed successfully
 	 * Otherwise null
 	 * */
-	private ParseTree checkAdjustedGrammar(String state, String created_string, GRule anycharsp) {
+	private ArrayList<ParseTree> successfullyParserUsingAdjustedGrammar(String state, String created_string, GRule anycharsp) {
+		ArrayList<ParseTree> pt_list = new ArrayList<ParseTree>();
 		try {
 			// Load the original master grammar
         	ParserLib pl_adjusted = null;
@@ -385,11 +417,21 @@ public class Fuzzer {
 			difference = d_end.getTime() - d_start.getTime();
     		this.setCurr_pl(pl_adjusted);
     		this.setCurr_ep(ep_adjusted);
-			ParseTree pt = this.getCurr_pl().parse_string(created_string, this.getCurr_ep());
-    		if(this.log) {
-    			System.out.println("String " + created_string + " successfully parsed using the adjusted golden grammar");
-			}
-			return pt;
+			// ParseTree pt = this.getCurr_pl().parse_string(created_string, this.getCurr_ep());
+			// Loop over the returned ArrayList containing ParseTrees that have been created using the adjusted golden grammar
+			ArrayList<ParseTree> lst = this.getCurr_pl().parse_string(created_string, this.getCurr_ep());
+			System.out.printf("Created %d different ParseTrees for %s", lst.size(), created_string);
+    		for(ParseTree pt : lst) {
+    			if(pt != null) {
+    				// Parsed successfully using the adjusted grammar
+    	    		if(this.log) {
+    	    			System.out.println("String " + created_string + " successfully parsed using the adjusted golden grammar");
+    				}
+    	    		// Add to return list
+    	    		pt_list.add(pt);
+    			}
+    		}
+        	return pt_list;
 		} catch (Exception e) {
   			if(this.log) {
 				System.out.println("Failed to parse the string using the adjusted grammar");
@@ -400,10 +442,11 @@ public class Fuzzer {
 
 	/*
 	 * Checks the adjusted Grammar
-	 * Returns a ParseTree if the string could be parsed successfully
+	 * Returns a list of ParseTree's if the string could be parsed successfully
 	 * Otherwise null
 	 * */
-	private ParseTree checkAdjustedGrammar(String state, HashMap<String, GDef> master, int gRuleC, int elemC, String created_string) {
+	private ArrayList<ParseTree> successfullyParserUsingAdjustedGrammar(String state, HashMap<String, GDef> master, int gRuleC, int elemC, String created_string) {
+		ArrayList<ParseTree> pt_list = new ArrayList<ParseTree>();
 		try {
 			ParserLib pl_adjusted = null;
 			EarleyParser ep_adjusted = null;
@@ -435,11 +478,21 @@ public class Fuzzer {
 			difference = d_end.getTime() - d_start.getTime();
 			this.setCurr_pl(pl_adjusted);
 			this.setCurr_ep(ep_adjusted);
-			ParseTree pt = this.getCurr_pl().parse_string(created_string, this.getCurr_ep());
-    		if(this.log) {
-    			System.out.println("String " + created_string + " successfully parsed using the adjusted golden grammar");
-			}
-			return pt;
+			// ParseTree pt = this.getCurr_pl().parse_string(created_string, this.getCurr_ep());
+			// Loop over the returned ArrayList containing ParseTrees that have been created using the adjusted golden grammar
+			ArrayList<ParseTree> lst = this.getCurr_pl().parse_string(created_string, this.getCurr_ep());
+			System.out.printf("Created %d different ParseTrees for %s", lst.size(), created_string);
+    		for(ParseTree pt : lst) {
+    			if(pt != null) {
+    				// Parsed successfully using the adjusted grammar
+    	    		if(this.log) {
+    	    			System.out.println("String " + created_string + " successfully parsed using the adjusted golden grammar");
+    				}
+    	    		// Add to return list
+    	    		pt_list.add(pt);
+    			}
+    		}
+        	return pt_list;
 		} catch (Exception e) {
   			if(this.log) {
 				System.out.println("Failed to parse the string using the adjusted grammar");
@@ -457,62 +510,103 @@ public class Fuzzer {
 	 * Returns: A new minimized ParseTree
 	 * 
 	 * */
-	private ParsedStringSettings identifiyAndRemoveAnycharChars(ParseTree result, String created_string, String state, HashMap<String, GDef> master, int gRuleC, int elemC, Entry<String, GDef> entry, GRule anycharsp) {
+	private ArrayList<ParsedStringSettings> identifiyAndRemoveAnycharChars(ParseTree result, String created_string, String state, HashMap<String, GDef> master, int gRuleC, int elemC, Entry<String, GDef> entry, GRule anycharsp) {
 		StringBuilder sb_created_string = new StringBuilder(created_string);
-		String anychars = result.print_tree_anychar_chars(); // Returns a sequence of characters that should been removed from created_string
-		int anychars_length = anychars.length();
-		int pos = result.getPosOfFirstAnychar(); // Returns the position at which the sequence starts (to avoid collisions with multiple occurrences)
-		if(this.log) {
-			System.out.println(String.format("String representing through <anychar>: %s\nAnychar string starting at position: %d\nTree:\n%s", anychars, pos, result.save_tree()));
-		}
-		if(created_string.regionMatches(pos, anychars, 0, anychars.length())) {
-			// sb_created_string.delete(pos, anychars.length() + 1);
-			for(int i = 0; i < anychars_length; i++) { // Can not use normal delete as there a strange behavior when start = end (then nothing will be deleted)
-				sb_created_string.deleteCharAt(pos); // Delete the character at position POS anychars_length-times
-			}
+		// As the given tree might have multiple sequences of <anychars>, we have to loop over until there is no character left that has been represented by an anychar tag
+		String anychars = result.print_tree_anychar_chars();
+		int anychars_length;
+		int pos;
+		int removed_chars = 0;
+		StringBuilder removed_chars_from_string = new StringBuilder("");
+		ArrayList<ParsedStringSettings> pss_lst = new ArrayList<ParsedStringSettings>();
+		// Initialize for the first iteration in while(){...}
+		HashMap<Integer, Integer> pos_length_lst = result.getMapOfPosStringAnychar();
+		Map<Integer, Integer> sorted_pos_length_lst = new TreeMap<Integer, Integer>(pos_length_lst);
+		int counter = 0;
+		for(Map.Entry<Integer, Integer> pos_length : sorted_pos_length_lst.entrySet()) {
+			System.out.println("Key: " + pos_length.getKey() + " Value: " + pos_length.getValue());
+			pos = pos_length.getKey();
+			pos -= removed_chars; // We take the length of characters, that have already been removed into account
+			anychars_length = pos_length.getValue();
 			if(this.log) {
-				if(anychars.equals("")) {
-					System.out.println(String.format("Removed nothing from the string as the anychar part is "
-							+ "representing the empty string. String remains: %s", sb_created_string));
-				}
-				else {
-					System.out.println(String.format("Removed %s from %s => %s", anychars, created_string, sb_created_string));
-				}
+				System.out.printf("Starting position to remove characters from: %d\nLength: %d\n", pos, anychars_length);
 			}
-			// Check if the string without anychar-chars will be rejected by the golden grammar and accepted by the adjusted golden grammar
-			// Differentiate between anychar and anycharsp (gRuleC and elemC = -1)
-			if(!(gRuleC == -1 && elemC == -1)) {
-				ParseTree pt = checkAdjustedGrammar(state, master, gRuleC, elemC, sb_created_string.toString());
-				if(!checkGoldenGrammar(sb_created_string.toString()) &&  pt != null) {
-		            ParsedStringSettings pss = new ParsedStringSettings(
-		            		sb_created_string.toString(),
-		            		pt.count_nodes(0, this.getExclude_grammars()),
-		            		pt.count_leafes(),
-		            		state, 
-		            		entry.getValue().get(gRuleC), 
-		            		entry.getValue().get(gRuleC).get(elemC), 
-		            		pt, 
-		            		this.getCurr_pl());
-		            return pss;
+			for(int i = 0; i < anychars_length; i++) { // Can not use normal delete as there a strange behavior when start = end (then nothing will be deleted))
+				try {
+					System.out.println("Lenght of the current string: " + sb_created_string.length());
+					removed_chars_from_string.append(sb_created_string.charAt(pos));
+					System.out.println("Removed char");
+					sb_created_string.deleteCharAt(pos); // Delete the character at position POS anychars_length-times
+					if(this.log) {
+						System.out.printf("Removed %s from %s\n", removed_chars_from_string.charAt(counter), sb_created_string);
+					}
+					counter += 1;
+				} catch (Exception e) {
+					System.out.printf("Exception: %s\nPos: %d, Removed chars: %d, anychars_length: %d\nremoved_chars_from_string: %s\nsb_created_string: %s",
+							e.toString(), pos, removed_chars, anychars_length, removed_chars_from_string.toString(), sb_created_string.toString());
 				}
+				
 			}
-			else { // <Anycharsp>
-				ParseTree pt = checkAdjustedGrammar(state, created_string, anycharsp);;
-				if(!checkGoldenGrammar(sb_created_string.toString()) &&  pt != null) {
-		            ParsedStringSettings pss = new ParsedStringSettings(
-		            		sb_created_string.toString(),
-		            		pt.count_nodes(0, this.getExclude_grammars()),
-		            		pt.count_leafes(),
-		            		state, 
-		            		null, 
-		            		"ADDED RULE <ANYCHARSP>", 
-		            		pt, 
-		            		this.getCurr_pl());
-		            return pss;
+			removed_chars += anychars_length;
+			// Get new data 
+			if(this.log) {
+				System.out.println(String.format("String representing through <anychar>: %s\n"
+						+ "Anychar string starting at position: %d\nLength of removed sequence: %d\n"
+						+ "String after removing those characters: %s\n", 
+						removed_chars_from_string, pos, anychars_length, sb_created_string));
+			}
+		}
+		if(this.log) {
+			if(sb_created_string.toString().equals("")) {
+				System.out.printf("Finished removing characters that have been displayed using <anychar> blocks.\nString before removing: %s\nString after removing those characters: %s\n",
+						created_string, "EMPTY STRING");
+			}
+			else {
+				System.out.printf("Finished removing characters that have been displayed using <anychar> blocks.\nString before removing: %s\nString after removing those characters: %s\n",
+						created_string, sb_created_string);
+			}
+		}
+		// Check if the string without anychar-chars will be rejected by the golden grammar and accepted by the adjusted golden grammar
+		// Differentiate between anychar and anycharsp (gRuleC and elemC = -1)
+		if(!(gRuleC == -1 && elemC == -1)) {
+			ArrayList<ParseTree> pt_lst = successfullyParserUsingAdjustedGrammar(state, master, gRuleC, elemC, sb_created_string.toString());
+			if(pt_lst != null) {
+				for(ParseTree pt : pt_lst) {
+					if(!successfullyParsedUsingGoldenGrammar(sb_created_string.toString()) &&  pt != null) {
+			            ParsedStringSettings pss = new ParsedStringSettings(
+			            		sb_created_string.toString(),
+			            		pt.count_nodes(0, this.getExclude_grammars()),
+			            		pt.count_leafes(),
+			            		state, 
+			            		entry.getValue().get(gRuleC), 
+			            		entry.getValue().get(gRuleC).get(elemC), 
+			            		pt, 
+			            		this.getCurr_pl());
+			            pss_lst.add(pss);
+					}
 				}
 			}
 		}
-		return null;
+		else { // <Anycharsp>
+			ArrayList<ParseTree> pt_lst = successfullyParserUsingAdjustedGrammar(state, created_string, anycharsp);
+			if(pt_lst != null) {
+				for(ParseTree pt : pt_lst) {
+					if(!successfullyParsedUsingGoldenGrammar(sb_created_string.toString()) &&  pt != null) {
+			            ParsedStringSettings pss = new ParsedStringSettings(
+			            		sb_created_string.toString(),
+			            		pt.count_nodes(0, this.getExclude_grammars()),
+			            		pt.count_leafes(),
+			            		state, 
+			            		null, 
+			            		"ADDED RULE <ANYCHARSP>", 
+			            		pt, 
+			            		this.getCurr_pl());
+			            pss_lst.add(pss);
+					}
+				}
+			}
+		}
+		return pss_lst;
 	}
 	
 	/*
@@ -520,16 +614,25 @@ public class Fuzzer {
 	 * Returns true if the string was parsed successfully
 	 * Otherwise returns false
 	 * */
-	private boolean checkGoldenGrammar(String adjusted_string) {
+	private boolean successfullyParsedUsingGoldenGrammar(String adjusted_string) {
 		try {
-			ParseTree result = this.getGolden_grammar_PL().parse_string(adjusted_string, this.getGolden_grammar_EP());
-			if(this.log) {
-				System.out.println("String " + adjusted_string + " successfully parsed using the golden grammar...");
+			// ParseTree result = this.getGolden_grammar_PL().parse_string(adjusted_string, this.getGolden_grammar_EP());
+			for(ParseTree pt : this.getGolden_grammar_PL().parse_string(adjusted_string, this.getGolden_grammar_EP())) {
+				if(pt != null) {
+					if(this.log) {
+						System.out.println("Golden grammar successfully parsed " + adjusted_string);
+					}
+					return true;
+				}
 			}
-			return true;
+			
+			if(this.log) {
+				System.out.println("Golden grammar could not parse " + adjusted_string);
+			}
+			return false;
 		} catch (Exception e) {
 			if(this.log) {
-				System.out.println("Golden grammar failed to parse " + adjusted_string + " successfully");
+				System.out.println("Golden grammar could not parse " + adjusted_string);
 			}
 			return false;
 		}

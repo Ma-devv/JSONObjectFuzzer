@@ -120,7 +120,7 @@ public class HDD {
 //					System.out.println("HDD: Successfully created EarleyParser with ParserLib grammar in " + difference / 1000 + " seconds");
 //				}
 				
-	    		ParseTree result = master_pss.getPl().parse_string(adjusted_string, ep_adjusted); // Try to parse the string
+	    		ParseTree result = null; master_pss.getPl().parse_string(adjusted_string, ep_adjusted); // Try to parse the string
 //	    		if(this.log) {
 //	    			System.out.println("HDD: String " + adjusted_string + " successfully parsed using the adjusted golden grammar");
 //				}
@@ -156,6 +156,8 @@ public class HDD {
 	}
 	
 	public ParsedStringSettings startHDD(ParsedStringSettings pss, HashSet<String> excludeSet, ParserLib golden_grammar_PL, EarleyParser golden_grammar_EP){
+		return null;
+		/*
 		if(this.log) {
 			System.out.println("Applying HDD");
 		}
@@ -165,6 +167,7 @@ public class HDD {
 			System.out.println("");
 		}
 		return perses_delta_debug(pss.getTree(), pss.getPl().grammar, pss, excludeSet);
+		*/
 	}
 	public ParserLib getGolden_grammar_PL() {
 		return golden_grammar_PL;

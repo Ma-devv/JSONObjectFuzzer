@@ -5,11 +5,14 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.Set;
 
 import javax.swing.plaf.basic.BasicInternalFrameTitlePane.MaximizeAction;
 
 import org.json.*;
+
+import jdk.internal.org.jline.terminal.Terminal;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -18,7 +21,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Date;
 
 class GRule extends ArrayList<String> {
     public GRule() {
@@ -314,7 +316,7 @@ class ParseTree {
 		}
 		else if(pt.name.equals("<anychars>") || pt.name.equals("<anychar>") || pt.name.equals("<anycharsp>") || pt.name.equals("<anycharp>")) {
 			if(!anychar_seen_gpofa) {
-				setAnycharSeenTrue(this);
+				setAnycharSeen(this, true);
 			}
 			
 		}
@@ -333,10 +335,128 @@ class ParseTree {
 		return _getPosOfFirstAnychar(this, 0);
 	}
 	
-    private void setAnycharSeenTrue(ParseTree master) {
-    	master.anychar_seen_gpofa = true;
+	
+	// Returns the (amount_of_seen_anychar + 1) position of an anychar tag
+	// E.g. calling this method with amount_of_seen_anychar = 0, this will return the position of the FIRST anychar tag as well as its length
+	// When calling this method with amount_of_seen_anychar = 1, this will return the position of the SECOND anychar tag as well as its length
+	// Returns null when no further anychar tags are coming after amount_of_seens_anychar
+	int pos_counter = 0;
+	int currently_seen_anychars = 0;
+	boolean return_break = false;
+	private HashMap<Integer, Integer> _getMapOfPosStringAnychar(ParseTree pt, HashMap<Integer, Integer> result, int amount_of_seen_anychar) {
+//		System.out.println(pt.name);
+		if(return_break) {
+			System.out.println("Return break");
+			return result;
+		}
+		// Check if "dead block". I.e. an anychar block without a terminal as a child
+//		else if((pt.name.equals("<anychars>") || pt.name.equals("<anychar>") || 
+//		    pt.name.equals("<anycharsp>") || pt.name.equals("<anycharp>")) &&
+//			pt.children.size() == 0) { 
+//			System.out.println("Deadblock");
+//			return result;
+//		}
+		else if(!pt.is_nt()) { // Is the given tree a character, i.e. a terminal?
+			if(!anychar_seen_gpofa) { // If so, did we already see a anychar tag?
+				pos_counter++;	 // If not, then we increase the position of the starting anychar string as we then pass by one terminal non anychar character
+//				System.out.println("Terminal. No <anychar> tag has been visited yet. Increased pos counter");
+			}
+			else { // We already saw an anychar tag
+				if(currently_seen_anychars >= amount_of_seen_anychar) {
+//					System.out.println("Terminal. Already visited an <anychar> tag");
+					if(result == null) { // Is this the first terminal character after an anychar tag?
+						result = new HashMap<Integer, Integer>(); // If yes, we create a new HashMap
+						result.put(pos_counter, 1); // And put the starting position as well as the currenct length
+//						System.out.println("First terminal within the <anychar> block");
+					}
+					else { // The HashMap already has elements
+//						System.out.println("Following terminal within the <anychar> block");
+						int length_of_anychar_string = result.get(pos_counter); // Get the value
+						result.put(pos_counter, length_of_anychar_string + 1); // Increase the length by one
+					}
+				}
+				else { // Should not happen
+//					System.out.println("Terminal. The amount of currently visited anychar blocks is bigger then it should be"); 
+					pos_counter++;
+				}
+			}
+		}
+		else if(pt.name.equals("<anychars>") || pt.name.equals("<anychar>") || pt.name.equals("<anycharsp>") || pt.name.equals("<anycharp>")) {
+//			System.out.println("Anychar block");
+			if(!anychar_seen_gpofa && currently_seen_anychars <= amount_of_seen_anychar) {
+				setAnycharSeen(this, true);
+//				System.out.println("Updated anychar_seen to true");
+			}
+			
+		}
+		else if(anychar_seen_gpofa) { // Should be true for the first tag after an anychar block
+//			System.out.println("First block after an anychar block. Increased currently seen anychars by 1");
+			currently_seen_anychars += 1; // Increase this counter here as we want to increase this counter when we finished one <anychar> block
+			if(currently_seen_anychars > amount_of_seen_anychar) {
+				return_break = true;
+//				System.out.println("Set return break to true");
+				if(result == null) { // So that we dont return null in case of an anychar block representing nothing 
+					result = new HashMap<Integer, Integer>();
+					result.put(-1, -1);
+					
+				}
+				return result;
+			}
+//			System.out.println("Set AnycharSeen to false as we continue");
+			setAnycharSeen(this, false);
+		}
+		for(ParseTree p : pt.children) {
+			if(return_break) {
+//				System.out.println("Return break");
+				return result;
+			}
+			HashMap<Integer, Integer> tmp = _getMapOfPosStringAnychar(p, result, amount_of_seen_anychar);
+			if(tmp != null) {
+				if(result == null) {
+					result = tmp;
+				}
+				else {
+					result.putAll(tmp);
+				}
+			}
+		}
+//		System.out.println("Return result");
+		return result;
+	}
+	
+	/*
+	 * Returns the length of the string BEFORE hitting a 
+	 * <anychar> rule in the tree
+	 * 
+	 * */
+	public HashMap<Integer, Integer> getMapOfPosStringAnychar() {
+		System.out.println(this.save_tree());
+		HashMap<Integer, Integer> result = new HashMap<Integer, Integer>();
+		int amount_of_seen_anychar = 0;
+		HashMap<Integer, Integer> pos_length_mapping = _getMapOfPosStringAnychar(this, null, amount_of_seen_anychar);
+		// Map.Entry<String, GDef> entry : master.entrySet()
+		// int anycharsBlock = 10; // TODO, should return the amount of anychars block within the tree
+		while(pos_length_mapping != null) {
+			pos_counter = 0;
+			currently_seen_anychars = 0;
+			return_break = false;
+			anychar_seen_gpofa = false;
+			amount_of_seen_anychar += 1;
+			int key = (Integer) pos_length_mapping.keySet().toArray()[0];
+			int value = pos_length_mapping.get(key);
+			System.out.printf("Key: %d, Value: %d\n", key, value);
+			if(!(key == -1 || value == -1)) {
+				result.put(key, value);
+			}
+			pos_length_mapping = _getMapOfPosStringAnychar(this, null, amount_of_seen_anychar);
+		}
+		return result;
+	}
+	
+    private void setAnycharSeen(ParseTree master, boolean value) {
+    	master.anychar_seen_gpofa = value;
 		for(ParseTree pt : master.children) {
-			setAnycharSeenTrue(pt);
+			setAnycharSeen(pt, value);
 		}
 		
 	}
@@ -381,7 +501,7 @@ class ParseForest implements Iterable<ParseTree> {
 
 interface ParserI {
     ParseForest parse_prefix(String text, String start_symbol);
-    Iterator<ParseTree> parse(String text, String start_symbol) throws ParseException;
+    ArrayList<ParseTree> parse(String text, String start_symbol) throws ParseException;
 }
 
 abstract class Parser implements ParserI {
@@ -404,18 +524,8 @@ abstract class Parser implements ParserI {
         }
     }
 
-    public Iterator<ParseTree> parse(String text) throws ParseException {
+    public ArrayList<ParseTree> parse(String text) throws ParseException {
         return this.parse(text, this.start_symbol);
-    }
-
-    @Override
-    public Iterator<ParseTree> parse(String text, String start_symbol) throws ParseException {
-        ParseForest p = this.parse_prefix(text, start_symbol);
-
-        if (p.cursor < text.length()) {
-            throw new ParseException("Syntax Error at: " + p.cursor);
-        }
-        return p.iterator();
     }
 }
 
@@ -766,17 +876,62 @@ class EarleyParser extends Parser {
          }
     }
 
+    
+    ParseTree extract_a_tree(NamedForest forest_node, int pos) {
+        if (forest_node.paths.isEmpty()) {
+            return new ParseTree(forest_node.name, new ArrayList<ParseTree>());
+        }
+
+        ArrayList<ParseTree> lst = new ArrayList<ParseTree>();
+        Random random = new Random();
+        pos = random.nextInt(forest_node.paths.size());
+        // System.out.printf("Paths: %d, rand: %d", forest_node.paths.size(), pos);
+		for (TPath p : forest_node.paths.get(pos)) {
+            lst.add(this.extract_a_tree(this.forest(p.sk.s, p.sk.k, p.chart), pos));
+        }
+	    //[self.extract_a_tree(self.forest(*p)) for p in paths[0]]
+        return new ParseTree(forest_node.name, lst);
+    }
+
+
+    ArrayList<ParseTree> extract_trees(NamedForest forest) {
+        ArrayList<ParseTree> pt = new ArrayList<ParseTree>();
+        if(forest.paths.size() > 1) {
+        	System.out.println("");
+        }
+        HashSet<String> h_pt = new HashSet<String>();
+        for(int i = 0; i < forest.paths.size(); i++) {
+        	for(int j = 0; j < 10; j++) {
+        		// For loop to randomize the path traversal - Hotfix for the time being
+        		ParseTree tmp = this.extract_a_tree(forest, i);
+        		if(!h_pt.contains(tmp.save_tree())) {
+        			h_pt.add(tmp.save_tree());
+        			pt.add(tmp);
+        			System.out.println("Nr " + h_pt.size() + ":\n" + tmp.save_tree());
+        		}
+        	}
+        }
+        if(pt.size() > 1) {
+        	System.out.println("");
+        }
+        return pt;
+    }
+    
+    /*
     ParseTree extract_a_tree(NamedForest forest_node) {
         if (forest_node.paths.isEmpty()) {
             return new ParseTree(forest_node.name, new ArrayList<ParseTree>());
         }
 
         ArrayList<ParseTree> lst = new ArrayList<ParseTree>();
-
+        ArrayList<ArrayList<ParseTree>> tmp_list = new ArrayList<ArrayList<ParseTree>>();
+        if(forest_node.paths.size() > 1) {
+        	System.out.println("");
+        }
 		for (TPath p : forest_node.paths.get(0)) {
             lst.add(this.extract_a_tree(this.forest(p.sk.s, p.sk.k, p.chart)));
         }
-        //[self.extract_a_tree(self.forest(*p)) for p in paths[0]]
+	    //[self.extract_a_tree(self.forest(*p)) for p in paths[0]]
         return new ParseTree(forest_node.name, lst);
     }
 
@@ -786,8 +941,9 @@ class EarleyParser extends Parser {
         pt.add(this.extract_a_tree(forest));
         return pt.iterator();
     }
-
-    public Iterator<ParseTree> parse(String text,String start_symbol) throws ParseException {
+    */
+    
+    public ArrayList<ParseTree> parse(String text,String start_symbol) throws ParseException {
         ParseForest p = this.parse_prefix(text, start_symbol);
         State start = null;
         for (State s : p.states) {
@@ -799,7 +955,7 @@ class EarleyParser extends Parser {
         	// NamedForest forest = this.parse_forest(this.table, start);
             throw new ParseException("at " + p.cursor);
         }
-
+        
         NamedForest forest = this.parse_forest(this.table, start);
         return this.extract_trees(forest);
     }
@@ -1024,25 +1180,11 @@ public class ParserLib {
         this._show_tree(result, 0);
     }
     
-    public ParseTree parse_text(String text_file) throws ParseException, IOException {
-        Path path = FileSystems.getDefault().getPath(text_file);
-        String content = Files.readString(path, StandardCharsets.UTF_8);
-
-        EarleyParser ep = new EarleyParser(this.grammar);
-        Iterator<ParseTree> result = ep.parse(content);
-        if (result.hasNext()) {
-            return result.next();
-        }
-        return null;
-    }
-    public ParseTree parse_string(String content, EarleyParser ep) throws ParseException, IOException {
+    public ArrayList<ParseTree> parse_string(String content, EarleyParser ep) throws ParseException, IOException {
     	// Equivalent to parse_text but without reading from a file; just parsing the fuzzed input
 		// EarleyParser ep = new EarleyParser(this.grammar);
-        Iterator<ParseTree> result = ep.parse(content);
-        if (result.hasNext()) {
-            return result.next();
-        }
-        return null;
+        ArrayList<ParseTree> result = ep.parse(content);
+        return result;
     }
 
 }
