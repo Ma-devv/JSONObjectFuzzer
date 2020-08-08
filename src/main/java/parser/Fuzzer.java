@@ -246,6 +246,7 @@ public class Fuzzer {
                         	            if(minimal_input_for_rule == null) {
                         	            	System.out.println("Could not minimize the string " + pss.getCreated_string() + " any further.");
                         	            }
+                        	            // We do not have to check if minimal_input_for_rule is null as addMinimalInputToList will take pss from above in case that this is null
                         	            addMinimalInputToList(minimal_input_for_rule, created_string, pss);
                         			}
                         			else {
@@ -293,6 +294,7 @@ public class Fuzzer {
                 	            if(minimal_input_for_rule == null) {
                 	            	System.out.println("Could not minimize the string " + pss.getCreated_string() + " any further.");
                 	            }
+                	            // We do not have to check if minimal_input_for_rule is null as addMinimalInputToList will take pss from above in case that this is null
                 	            addMinimalInputToList(minimal_input_for_rule, created_string, pss);
                     		}
                     		else {
@@ -379,7 +381,6 @@ public class Fuzzer {
 			}
 			ParseTree pt = pl.check_string(created_string, ep);
 			if(pt != null) {
-				System.out.println(pt.tree_to_string());
 				return pt;
 			}
 		} catch (Exception e) {
@@ -589,15 +590,20 @@ public class Fuzzer {
 		// Differentiate between anychar and anycharsp (gRuleC and elemC = -1)
 		if(!(gRuleC == -1 && elemC == -1)) {
 			ParseTree pt = checkStringWithAdjustedGrammar(sb_created_string.toString(), this.getCurr_pl(), this.getCurr_ep());
+//			if(this.log) {
+//				System.out.printf("Comparision between the two trees\nOriginal tree: %s\nNew tree: %s\n", result.tree_to_string(), pt.tree_to_string());
+//			}
 			if(!successfullyParsedUsingGoldenGrammar(sb_created_string.toString()) &&  pt != null) {
 	            pss = new ParsedStringSettings(
+	            		created_string,
 	            		sb_created_string.toString(),
-	            		pt.count_nodes(0, this.getExclude_grammars()),
-	            		pt.count_leafes(),
+	            		"",
+	            		result.count_nodes(0, this.getExclude_grammars()),
+	            		result.count_leafes(),
 	            		state, 
 	            		entry.getValue().get(gRuleC), 
 	            		entry.getValue().get(gRuleC).get(elemC), 
-	            		pt, 
+	            		result, 
 	            		this.getCurr_pl());
 			}
 		}
@@ -605,13 +611,15 @@ public class Fuzzer {
 			ParseTree pt = checkStringWithAdjustedGrammar(sb_created_string.toString(), this.getCurr_pl(), this.getCurr_ep());
 			if(!successfullyParsedUsingGoldenGrammar(sb_created_string.toString()) &&  pt != null) {
 	            pss = new ParsedStringSettings(
+	            		created_string,
 	            		sb_created_string.toString(),
-	            		pt.count_nodes(0, this.getExclude_grammars()),
-	            		pt.count_leafes(),
+	            		"",
+	            		result.count_nodes(0, this.getExclude_grammars()),
+	            		result.count_leafes(),
 	            		state, 
 	            		null, 
 	            		"ADDED RULE <ANYCHARSP>", 
-	            		pt, 
+	            		result, 
 	            		this.getCurr_pl());
 			}
 		}

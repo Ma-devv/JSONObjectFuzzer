@@ -65,6 +65,10 @@ public class HDD {
 					if(pss != null) { // Now we have to check if the modified non terminals can be parsed again using the adjusted grammar
 						// If it is possible to parse the adjusted string with the adjusted grammar, then we proceed
 						// System.out.println("Pss for subtree " + bsymbol + ":\n" + pss.toString());
+						if(this.log) {
+							System.out.println("Set new \"Minimized string using HDD\": " + pss.getCreated_string()); // Created string = hdd string; we set the hdd string
+							// at the end in startHDD before returning
+						}
 						reprocess = stree.getPt();
 						result = pss;
 						break;
@@ -96,6 +100,9 @@ public class HDD {
 				return true;
 			}
 		}
+		if(this.log) {
+			System.out.println("Terminals within the tree are all represented using <anychar>.");
+		}
 		return false;
 	}
 	private ParsedStringSettings checkIfPossibleToParse(ParsedStringSettings master_pss, String adjusted_string, HashSet<String> excludeSet, String bsymbol) {
@@ -117,15 +124,16 @@ public class HDD {
 				ep_adjusted = new EarleyParser(master_pss.getPl().grammar);
 	    		ParseTree result = master_pss.getPl().check_string(adjusted_string, ep_adjusted); // Try to parse the string
 	    		if(result != null) {
-	    			String s = !adjusted_string.equals("") ? String.format("Original string: %s => minimized string: %s", master_pss.getCreated_string(), adjusted_string)
-		    				: String.format("Original string: %s => minimized string is an EMPTY STRING: %s", master_pss.getCreated_string(), adjusted_string);
-		            ParsedStringSettings pss = new ParsedStringSettings(
-		            		s, // Created string
+	    			master_pss.setHdd_string(adjusted_string);
+	    			ParsedStringSettings pss = new ParsedStringSettings(
+		            		adjusted_string, // Created string
+		            		"",
+		            		"",
 		            		master_pss.getTree().count_nodes(0, excludeSet),
 		            		master_pss.getTree().count_leafes(),
 		            		master_pss.getChanged_rule(), 
 		            		master_pss.getChanged_token(), 
-		            		master_pss.getChanged_elem() + "\nOld tree before applying HDD:\n", 
+		            		master_pss.getChanged_elem(), 
 		            		master_pss.getTree(),
 		            		master_pss.getPl());
 					if(this.log) {
@@ -152,12 +160,23 @@ public class HDD {
 	
 	public ParsedStringSettings startHDD(ParsedStringSettings pss, HashSet<String> excludeSet, ParserLib golden_grammar_PL, EarleyParser golden_grammar_EP){		
 		if(this.log) {
-			System.out.printf("Applying HDD\nString to minimize: %s\nTree to minimize:\n%s\n", pss.getCreated_string(), pss.getTree().tree_to_string());
+			System.out.printf("Applying HDD\nID: %s\nString to minimize: %s\nTree to minimize:\n%s\n", pss.hashCode(), pss.getCreated_string(), pss.getTree().tree_to_string());
 		}
 		this.setGolden_grammar_PL(golden_grammar_PL);
 		this.setGolden_grammar_EP(golden_grammar_EP);
-		return perses_delta_debug(pss.getTree(), pss.getPl().grammar, pss, excludeSet);
-		
+		ParsedStringSettings result = perses_delta_debug(pss.getTree(), pss.getPl().grammar, pss, excludeSet);
+		if(result != null) {
+			pss.setHdd_string(result.getCreated_string());
+			if(this.log) {
+				System.out.println("Updated HDD string: " + result.getCreated_string());
+			}
+		}
+		else {
+			if(this.log) {
+				System.out.println("Unable to minimized the string " + pss.getRemoved_anychar_string() + " any further");
+			}
+		}
+		return pss;
 	}
 	public ParserLib getGolden_grammar_PL() {
 		return golden_grammar_PL;
