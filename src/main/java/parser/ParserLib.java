@@ -171,6 +171,23 @@ class ParseTree {
         this.name = name;
         this.children = children;
     }
+    /*
+     * Copy
+     * */
+    
+    public ParseTree(ParseTree source) {
+    	this.name = source.name;
+    	this.indented_nt = source.indented_nt;
+    	this.anychar_seen_gpofa = source.anychar_seen_gpofa;
+    	this.pos_counter = source.pos_counter;
+    	this.currently_seen_anychars = source.currently_seen_anychars;
+    	this.return_break = source.return_break;
+    	this.children = new ArrayList<ParseTree>();
+    	for(ParseTree pt_source : source.children) {
+    		this.children.add(new ParseTree(pt_source));
+    	}
+    }
+    
     private int _count_leafes(ParseTree tree, int nodeCount) {
     	// System.out.println(tree.name);
     	int result = nodeCount;
@@ -364,7 +381,7 @@ class ParseTree {
 	private HashMap<Integer, Integer> _getMapOfPosStringAnychar(ParseTree pt, HashMap<Integer, Integer> result, int amount_of_seen_anychar) {
 //		System.out.println(pt.name);
 		if(return_break) {
-			System.out.println("Return break");
+//			System.out.println("Return break");
 			return result;
 		}
 		// Check if "dead block". I.e. an anychar block without a terminal as a child
@@ -429,6 +446,7 @@ class ParseTree {
 				return result;
 			}
 			HashMap<Integer, Integer> tmp = _getMapOfPosStringAnychar(p, result, amount_of_seen_anychar);
+			// TODO WE NEED TO CHECK HERE IF THE ANYCHAR BLOCKS ARE OVER, OTHERWISE WE DO HAVE A PROBLEM WHEN A TERMINAL SYMBOL FOLLOWS DIRECTLY ON AN ANYCHAR BLOCK
 			if(tmp != null) {
 				if(result == null) {
 					result = tmp;
@@ -436,6 +454,22 @@ class ParseTree {
 				else {
 					result.putAll(tmp);
 				}
+			}
+			if(anychar_seen_gpofa && !((pt.name.equals("<anychars>") || pt.name.equals("<anychar>") || pt.name.equals("<anycharsp>") || pt.name.equals("<anycharp>")))) { // Should be true for the first tag after an anychar block
+//				System.out.println("Reached first parent block not representing anychar. Increased currently seen anychars by 1");
+				currently_seen_anychars += 1; // Increase this counter here as we want to increase this counter when we finished one <anychar> block
+				if(currently_seen_anychars > amount_of_seen_anychar) {
+					return_break = true;
+//					System.out.println("Set return break to true");
+					if(result == null) { // So that we dont return null in case of an anychar block representing nothing 
+						result = new HashMap<Integer, Integer>();
+						result.put(-1, -1);
+						
+					}
+					return result;
+				}
+//				System.out.println("Set AnycharSeen to false as we continue");
+				setAnycharSeen(this, false);
 			}
 		}
 //		System.out.println("Return result");
@@ -448,7 +482,7 @@ class ParseTree {
 	 * 
 	 * */
 	public HashMap<Integer, Integer> getMapOfPosStringAnychar() {
-		System.out.println(this.tree_to_string());
+//		System.out.println(this.tree_to_string());
 		HashMap<Integer, Integer> result = new HashMap<Integer, Integer>();
 		int amount_of_seen_anychar = 0;
 		HashMap<Integer, Integer> pos_length_mapping = _getMapOfPosStringAnychar(this, null, amount_of_seen_anychar);
@@ -462,7 +496,7 @@ class ParseTree {
 			amount_of_seen_anychar += 1;
 			int key = (Integer) pos_length_mapping.keySet().toArray()[0];
 			int value = pos_length_mapping.get(key);
-			System.out.printf("Key: %d, Value: %d\n", key, value);
+//			System.out.printf("Key: %d, Value: %d\n", key, value);
 			if(!(key == -1 || value == -1)) {
 				result.put(key, value);
 			}
@@ -499,6 +533,38 @@ class ParseTree {
         }
         return tree;
     }
+    
+    
+    /*
+     * Used for HDD
+     * Given a subtree and a target tree, this method will replace
+     * the target tree with the subtree. With doing this, we can
+     * easily extract the corresponding string to the new generated
+     * tree. Note: Subtree has to be a real subtree of the targetTree
+     * Returns a modified target tree
+     * */
+    public void replaceTreeNode(ParseTree biggest_node, ParseTree subtree_target) {
+    	// Call replaceTreeNode recursive as long as the given subtree matches the subtree of the targetTree
+//    	System.out.printf("\nCurrent node (%d):\n%s\n", this.hashCode(), this.tree_to_string());
+    	if(this.hashCode() == biggest_node.hashCode() && this.name.equals(biggest_node.name)) {
+//    		System.out.println("Replaced " + this.name + ":\n" + this.tree_to_string());
+    		this.children = subtree_target.children;
+//    		System.out.println("Through\n" + subtree_target.tree_to_string());
+    	}
+    	for(ParseTree pt : this.children) {
+    		pt.replaceTreeNode(biggest_node, subtree_target);
+    	}
+    }
+
+	@Override
+	public int hashCode() {
+		// We need to adjust the hashCode() as we need something to compare 
+		// two objects during HDD (equals not possible due to deep copy)
+		return this.count_leafes() + this.getTerminals().hashCode();
+	}
+    
+    
+    
 }
 
 class ParseForest implements Iterable<ParseTree> {
@@ -919,9 +985,6 @@ class EarleyParser extends Parser {
 
     ArrayList<ParseTree> extract_trees(NamedForest forest) {
         ArrayList<ParseTree> pt = new ArrayList<ParseTree>();
-        if(forest.paths.size() > 1) {
-        	System.out.println("");
-        }
         HashSet<String> h_pt = new HashSet<String>();
         for(int i = 0; i < forest.paths.size(); i++) {
         	for(int j = 0; j < 20; j++) {
@@ -930,12 +993,9 @@ class EarleyParser extends Parser {
         		if(!h_pt.contains(tmp.tree_to_string())) {
         			h_pt.add(tmp.tree_to_string());
         			pt.add(tmp);
-        			System.out.println("Nr " + h_pt.size() + ":\n" + tmp.tree_to_string());
+//        			System.out.println("Nr " + h_pt.size() + ":\n" + tmp.tree_to_string());
         		}
         	}
-        }
-        if(pt.size() > 1) {
-        	System.out.println("");
         }
         return pt;
     }

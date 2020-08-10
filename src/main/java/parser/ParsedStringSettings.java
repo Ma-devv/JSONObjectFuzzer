@@ -26,6 +26,22 @@ public class ParsedStringSettings {
 		this.pl = pl;
 	}
 	
+	/*
+	 * Copy
+	 * */
+	public ParsedStringSettings(ParsedStringSettings source) {
+		this.created_string = source.created_string;
+		this.removed_anychar_string = source.removed_anychar_string;
+		this.hdd_string = source.hdd_string;
+		this.tree_size = source.tree_size;
+		this.leaf_size = source.leaf_size;
+		this.changed_rule = source.changed_rule;
+		this.changed_token = source.changed_token;
+		this.changed_elem = source.changed_elem;
+		this.tree = new ParseTree(source.tree);
+		this.pl = source.pl;
+	}
+	
 	public int getTree_size() {
 		return tree_size;
 	}
@@ -92,22 +108,23 @@ public class ParsedStringSettings {
 		if(this.getChanged_rule().equals("<elements>")) {
 			System.out.println("");
 		}
-//		String result = String.format("ID: %s\nString: %s\nString after removing characters represented using <anychar>: %s\nMinimized string using HDD: %s\nAdjusted rule: %s\n"
-//									+ "Adjusted token: %s\nAdjusted element: %s\nTree size: %d\nTree:\n%s\nLeaf size: %d\n",
-//				this.hashCode(),
+		String ras = this.getRemoved_anychar_string().equals("") ? "Empty string" : this.getRemoved_anychar_string(); 
+		String result = String.format("ID: %s\nString: %s\nString after removing characters represented using <anychar>: %s\nMinimized string using HDD: %s\nAdjusted rule: %s\n"
+									+ "Adjusted token: %s\nAdjusted element: %s\nTree size: %d\nTree:\n%s\nLeaf size: %d\n",
+				this.hashCode(),
+				this.getCreated_string(), // Created string
+				ras, // String after removing <anychar> parts
+				this.getHdd_string(), // Minimized string using hdd
+				this.getChanged_rule(), // Adjusted rule 
+				this.getChanged_token(), // Adjusted Token 
+				this.getChanged_elem(), // Adjusted Element
+				this.getTree_size(), // Tree size 
+				this.getTree().tree_to_string(), // Tree
+				this.getLeaf_size()); // Leaf size
+//		String result = String.format("String: %s\nString after removing characters represented using <anychar>: %s\nMinimized string using HDD: %s\n",
 //				this.getCreated_string(), // Created string
 //				this.getRemoved_anychar_string(), // String after removing <anychar> parts
-//				this.getHdd_string(), // Minimized string using hdd
-//				this.getChanged_rule(), // Adjusted rule 
-//				this.getChanged_token(), // Adjusted Token 
-//				this.getChanged_elem(), // Adjusted Element
-//				this.getTree_size(), // Tree size 
-//				this.getTree().tree_to_string(), // Tree
-//				this.getLeaf_size()); // Leaf size
-		String result = String.format("String: %s\nString after removing characters represented using <anychar>: %s\nMinimized string using HDD: %s\n",
-				this.getCreated_string(), // Created string
-				this.getRemoved_anychar_string(), // String after removing <anychar> parts
-				this.getHdd_string()); // Minimized string using hdd
+//				this.getHdd_string()); // Minimized string using hdd
 		
 		return result;
 	}
