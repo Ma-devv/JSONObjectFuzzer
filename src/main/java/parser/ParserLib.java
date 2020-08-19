@@ -543,16 +543,20 @@ class ParseTree {
      * tree. Note: Subtree has to be a real subtree of the targetTree
      * Returns a modified target tree
      * */
-    public void replaceTreeNode(ParseTree biggest_node, ParseTree subtree_target) {
+    public void replaceTreeNode(ParseTree biggest_node, ParseTree subtree_target, boolean log) {
     	// Call replaceTreeNode recursive as long as the given subtree matches the subtree of the targetTree
 //    	System.out.printf("\nCurrent node (%d):\n%s\n", this.hashCode(), this.tree_to_string());
     	if(this.hashCode() == biggest_node.hashCode() && this.name.equals(biggest_node.name)) {
-//    		System.out.println("Replaced " + this.name + ":\n" + this.tree_to_string());
+//    		if(log) {
+//    			System.out.println("Replaced " + this.name + ":\n" + this.tree_to_string());
+//    		}
     		this.children = subtree_target.children;
-//    		System.out.println("Through\n" + subtree_target.tree_to_string());
+//    		if(log) {
+//    			System.out.println("Through\n" + subtree_target.tree_to_string());
+//    		}
     	}
     	for(ParseTree pt : this.children) {
-    		pt.replaceTreeNode(biggest_node, subtree_target);
+    		pt.replaceTreeNode(biggest_node, subtree_target, log);
     	}
     }
 

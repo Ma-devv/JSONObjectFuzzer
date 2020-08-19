@@ -11,8 +11,9 @@ public class ParsedStringSettings {
 	private String changed_elem;
 	private ParseTree tree;
 	private ParserLib pl;
+	private String data_type;
 	
-	public ParsedStringSettings(String created_string, String removed_anychar_string, String hdd_string, int tree_size, int leaf_size, String changed_rule, GRule token, String changed_elem, ParseTree tree, ParserLib pl) {
+	public ParsedStringSettings(String created_string, String removed_anychar_string, String hdd_string, int tree_size, int leaf_size, String changed_rule, GRule token, String changed_elem, ParseTree tree, ParserLib pl, String data_type) {
 		super();
 		this.created_string = created_string;
 		this.removed_anychar_string = removed_anychar_string;
@@ -24,6 +25,7 @@ public class ParsedStringSettings {
 		this.changed_elem = changed_elem;
 		this.tree = tree;
 		this.pl = pl;
+		this.data_type = data_type;
 	}
 	
 	/*
@@ -40,6 +42,7 @@ public class ParsedStringSettings {
 		this.changed_elem = source.changed_elem;
 		this.tree = new ParseTree(source.tree);
 		this.pl = source.pl;
+		this.data_type = source.data_type;
 	}
 	
 	public int getTree_size() {
@@ -101,6 +104,12 @@ public class ParsedStringSettings {
 	}
 	public void setRemoved_anychar_string(String removed_anychar_string) {
 		this.removed_anychar_string = removed_anychar_string;
+	}
+	public String getData_type() {
+		return data_type;
+	}
+	public void setData_type(String data_type) {
+		this.data_type = data_type;
 	}
 
 	@Override

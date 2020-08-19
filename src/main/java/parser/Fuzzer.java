@@ -1,5 +1,4 @@
 package parser;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -10,9 +9,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
-import java.util.SortedSet;
 import java.util.TreeMap;
 import java.util.concurrent.ThreadLocalRandom;
+
+import org.json.JSONArray;
 import org.json.JSONObject;
 
 
@@ -30,9 +30,10 @@ public class Fuzzer {
 	private ArrayList<Character> char_set = new ArrayList<Character>(); // Generated 
 	private Set<Integer> special_char = new HashSet<Integer>(); // special characters 
 	
-	private Map<String, ArrayList<String>> errors = new HashMap<String, ArrayList<String>>(); // create a dictionary for the errors
-	
 	// Error handling
+	private final String text_must_begin_with_array = "A JSONArray text must begin with";
+	private final String text_must_end_with_array = "A JSONArray text must end with";
+	
 	private final String text_must_begin_with = "A JSONObject text must begin with";
 	private final String text_must_end_with = "A JSONObject text must end with";
 	private final String expected_a = "Expected";
@@ -46,6 +47,8 @@ public class Fuzzer {
 	private final String incomplete = "incomplete";
 	private final String complete = "complete";
 	
+	private String parsed_data_type = ""; // Will be set during fuzzing; either OBJECT for JSON object or ARRAY for JSON array
+	
 	// For Hierarchical Delta Debugging
 	private List<Column> curr_table; // Saves the current table that parse() is generating
 	private List<Column> old_table; // Saves the last table that parse() has been generated
@@ -57,15 +60,13 @@ public class Fuzzer {
 	private ParserLib old_pl;
 	private EarleyParser old_ep;
 	private String tree_key;
-	private Set<String> already_adjusted = new HashSet<String>();
 	private Grammar anychar_grammar;
 	private ArrayList<ParsedStringSettings> listForEasiestMod = new ArrayList<ParsedStringSettings>();
 	
-	private boolean log = false;
+	private boolean log = true;
 	private final int MAX_INPUT_LENGTH = 100; // Sets the maximal input length when creating a string
 	private HashSet<String> exclude_grammars = new HashSet<>(Arrays.asList("<anychar>", "<anychars>", "<anycharsp>", "<anycharp>"));
-	
-	public static void main(String[] args) {		
+	public static void main(String[] args) {
 		Fuzzer fuzzer = new Fuzzer("", 0, null, args[0], null); // Create new Fuzzer; initialize grammar
 		try {
 			fuzzer.create_valid_strings(50, fuzzer.log); // Create 20 valid strings; no log level enabled
@@ -84,7 +85,7 @@ public class Fuzzer {
 		}
 		
 	}
-	
+
 	// Constructor
 	public Fuzzer(String rv, int n, Character c, String grammar, String json_file) {
 		super();
@@ -113,11 +114,6 @@ public class Fuzzer {
 			if(created_string != null) {
 				// Check if the created string is also valid according to the "golden grammar"
 		        try {
-		            // created_string = "{H}";
-		        	// created_string = "{7w\f\b	:e	,A- 'm \f:y 	\b}";
-//		        	created_string = "{\"abcd\": [{\"pqrs\":}]}";
-		        	created_string = "{\"ab\": [{\"cd\": {\"ef\":}}]}";
-		        	// created_string = "\"abcd\"";
 		        	System.out.println("\nCreated string [" + (i + 1) + "]: " + created_string);
 	        		for(ParseTree pt : this.getCurr_pl().parse_string(created_string, this.getCurr_ep())) {
 	        			if(pt != null) {
@@ -142,6 +138,7 @@ public class Fuzzer {
 		        	// Hence the string is valid for org.json.JSONObject 
 		        	// but is not according to the golden grammar
 		            // Change the golden grammar until the string can be parsed
+		        	// System.out.println("Failed by the GG " + e.toString());
 		        	change_everything_except_anychar_one_after_another(created_string);
 		        	// Now we try to get the smallest input that is causing the error/exception
 		        	// TODO
@@ -190,11 +187,13 @@ public class Fuzzer {
 		/*
     	 * For every rule within the grammar, loop over the entries within the rule and replace each non terminal one at a time
     	 */
+		int counter = 0;
     	HashMap<String, GDef> master = this.getCurr_pl().grammar; // First rule is unchanged and acts as master grammar
-    	for(Map.Entry<String, GDef> entry : master.entrySet()) { // 
+    	for(Map.Entry<String, GDef> entry : master.entrySet()) { //
+    		counter++;
     		String state = entry.getKey().toString();
     		if(this.log) {
-    			System.out.println("\n\n----STATE: " + state + "----");
+    			System.out.println("\n\n----STATE " + counter + "/" + master.size() + ": " + state + "----");
     		}
     		
     		if(this.getExclude_grammars().contains(state)) {
@@ -211,31 +210,17 @@ public class Fuzzer {
 					try {
 						// Try to parse the string using the adjusted golden grammar. If successful, try to get (multiple) ParseTrees
                 		ArrayList<ParseTree> result_lst = getMultipleParseTreesUsingAdjustedGrammar(state, master, gRuleC, elemC, created_string);
-                		// ParseTree result = this.getCurr_pl().parse_string(created_string, this.getCurr_ep()); // Try to parse the string
                 		if(result_lst != null) {
-                    		for(ParseTree result : result_lst) {
-                        		if(result != null) {
-                        			ParsedStringSettings pss = identifiyAndRemoveAnycharChars(result, created_string, state, master, gRuleC, elemC, entry, null);
-                        			if(pss != null) {
-                        				// System.out.println(pss.toString());
-                        	            HDD hdd = new HDD();
-                        	            ParsedStringSettings minimal_input_for_rule = hdd.startHDD(pss, this.getExclude_grammars(), this.getGolden_grammar_PL(), this.getGolden_grammar_EP());
-                        	            if(minimal_input_for_rule == null) {
-                        	            	System.out.println("Could not minimize the string " + pss.getCreated_string() + " any further.");
-                        	            }
-                        	            addMinimalInputToList(pss);
-                        			}
-                        			else {
-                            			if(this.log) {
-                            				System.out.println("Returned ParsedStringSettings is null. Continue with the next returned ParseTree or with the adjustment of the next rule");
-                            			}
-                        			}
-                        		}
-                        		else {
-                        			if(this.log) {
-                        				System.out.println("Continue with the next returned ParseTree or with the adjustment of the next rule");
-                        			}
-                        		}
+                			ParsedStringSettings pss = getBestTree(result_lst, created_string, state, master, gRuleC, elemC, entry, null);
+                			if(pss != null) {
+                	            HDD hdd = new HDD();
+                	            hdd.startHDD(pss, this.getExclude_grammars(), this.getGolden_grammar_PL(), this.getGolden_grammar_EP(), this.log);;
+                	            addMinimalInputToList(pss);
+                    		}
+                    		else {
+                    			if(this.log) {
+                    				System.out.println("Continue with the next returned ParseTree or with the adjustment of the next rule");
+                    			}
                     		}
                 		}
     				} catch (Exception e) {
@@ -256,29 +241,16 @@ public class Fuzzer {
 			try {
         		ArrayList<ParseTree> result_lst = getMultipleParseTreesUsingAdjustedGrammar(state, created_string, anycharsp);
         		if(result_lst != null) {
-            		for(ParseTree result : result_lst) {
-            			if(result != null) {
-                			// ParseTree result = this.getCurr_pl().parse_string(created_string, this.getCurr_ep()); // Try to parse the string
-                    		ParsedStringSettings pss = identifiyAndRemoveAnycharChars(result, created_string, state, master, -1, -1, entry, anycharsp);
-                    		if(pss != null) {
-                	            HDD hdd = new HDD();
-                	            ParsedStringSettings minimal_input_for_rule = hdd.startHDD(pss, this.getExclude_grammars(), this.getGolden_grammar_PL(), this.getGolden_grammar_EP());
-                	            if(minimal_input_for_rule == null) {
-                	            	System.out.println("Could not minimize the string " + pss.getCreated_string() + " any further.");
-                	            }
-                	            addMinimalInputToList(pss);
-                    		}
-                    		else {
-                    			if(this.log) {
-                    				System.out.println("Returned ParsedStringSettings is null. Continue with the next returned ParseTree or with the adjustment of the next rule");
-                    			}
-                    		}
-                		}
-                 		else {
-                			if(this.log) {
-                				System.out.println("Continue with the next returned ParseTree or with the adjustment of the next rule");
-                			}
-                		}
+        			ParsedStringSettings pss = getBestTree(result_lst, created_string, state, master, -1, -1, entry, anycharsp);
+        			if(pss != null) {
+        	            HDD hdd = new HDD();
+        	            hdd.startHDD(pss, this.getExclude_grammars(), this.getGolden_grammar_PL(), this.getGolden_grammar_EP(), true);
+        	            addMinimalInputToList(pss);
+            		}
+             		else {
+            			if(this.log) {
+            				System.out.println("Continue with the next returned ParseTree or with the adjustment of the next rule");
+            			}
             		}
         		}
 			} catch (Exception e) {
@@ -286,7 +258,7 @@ public class Fuzzer {
 			}
     		
     	}
-    	if(this.log) {
+    	if(true) {
     		System.out.println("\n\nDone with adjusting the grammar for " + created_string + "\n\n");
 		}
     	if(true) {
@@ -299,6 +271,116 @@ public class Fuzzer {
     	System.exit(0);
 	}
 	
+	private ParsedStringSettings getBestTree(ArrayList<ParseTree> result_lst, String created_string, String state, HashMap<String, GDef> master, int gRuleC, int elemC, Entry<String, GDef> entry, GRule anycharsp) {
+		ParsedStringSettings pss = null;
+		System.out.printf("Original string: %s\tLength %d\n", created_string, created_string.length());
+		for(ParseTree pt : result_lst) {
+			// As the given tree might have multiple sequences of <anychars>, we have to loop over until there is no character left that has been represented by an anychar tag
+			StringBuilder sb_created_string = new StringBuilder(created_string);
+			int anychars_length;
+			int pos;
+			int removed_chars = 0;
+			StringBuilder removed_chars_from_string = new StringBuilder("");
+			// Initialize for the first iteration in while(){...}
+			HashMap<Integer, Integer> pos_length_lst = pt.getMapOfPosStringAnychar();
+			Map<Integer, Integer> sorted_pos_length_lst = new TreeMap<Integer, Integer>(pos_length_lst);
+			int counter = 0;
+			for(Map.Entry<Integer, Integer> pos_length : sorted_pos_length_lst.entrySet()) {
+//				System.out.println("Key: " + pos_length.getKey() + " Value: " + pos_length.getValue());
+				pos = pos_length.getKey();
+				pos -= removed_chars; // We take the length of characters, that have already been removed into account
+				anychars_length = pos_length.getValue();
+//				if(this.log) {
+//					System.out.printf("Starting position to remove characters from: %d\nLength: %d\n", pos, anychars_length);
+//				}
+				for(int i = 0; i < anychars_length; i++) { // Can not use normal delete as there a strange behavior when start = end (then nothing will be deleted))
+					try {
+//						System.out.println("Lenght of the current string: " + sb_created_string.length());
+						removed_chars_from_string.append(sb_created_string.charAt(pos));
+//						System.out.println("Removed char");
+						sb_created_string.deleteCharAt(pos); // Delete the character at position POS anychars_length-times
+//						if(this.log) {
+//							System.out.printf("Removed %s from %s\n", removed_chars_from_string.charAt(counter), sb_created_string);
+//						}
+						counter += 1;
+					} catch (Exception e) {
+						System.out.printf("Exception: %s\nPos: %d, Removed chars: %d, anychars_length: %d\nremoved_chars_from_string: %s\nsb_created_string: %s",
+								e.toString(), pos, removed_chars, anychars_length, removed_chars_from_string.toString(), sb_created_string.toString());
+					}
+					
+				}
+				removed_chars += anychars_length;
+			}
+			if(this.log) {
+				System.out.println(String.format("String representing through <anychar>: %s\tLength %d\n"
+						+ "String after removing those characters: %s\n", 
+						removed_chars_from_string, removed_chars_from_string.length(), sb_created_string));
+			}
+			if(pss == null) {
+				if(!(gRuleC == -1 && elemC == -1)) {
+					pss = new ParsedStringSettings(
+		            		created_string,
+		            		sb_created_string.toString(),
+		            		"",
+		            		pt.count_nodes(0, this.getExclude_grammars()),
+		            		pt.count_leafes(),
+		            		state, 
+		            		entry.getValue().get(gRuleC), 
+		            		entry.getValue().get(gRuleC).get(elemC), 
+		            		pt, 
+		            		this.getCurr_pl(),
+		            		this.getParsed_data_type());
+				}
+				else { // <Anycharsp>
+					pss = new ParsedStringSettings(
+			            		created_string,
+			            		sb_created_string.toString(),
+			            		"",
+			            		pt.count_nodes(0, this.getExclude_grammars()),
+			            		pt.count_leafes(),
+			            		state, 
+			            		null, 
+			            		"ADDED RULE <ANYCHARSP>", 
+			            		pt, 
+			            		this.getCurr_pl(),
+			            		this.getParsed_data_type());
+				}
+			} else {
+				if(sb_created_string.length() > pss.getRemoved_anychar_string().length()) { // check if the amount of characters that have been removed due to anychar is smaller than the current one
+					if(!(gRuleC == -1 && elemC == -1)) {
+						pss = new ParsedStringSettings(
+			            		created_string,
+			            		sb_created_string.toString(),
+			            		"",
+			            		pt.count_nodes(0, this.getExclude_grammars()),
+			            		pt.count_leafes(),
+			            		state, 
+			            		entry.getValue().get(gRuleC), 
+			            		entry.getValue().get(gRuleC).get(elemC), 
+			            		pt, 
+			            		this.getCurr_pl(),
+			            		this.getParsed_data_type());
+					}
+					else { // <Anycharsp>
+						pss = new ParsedStringSettings(
+				            		created_string,
+				            		sb_created_string.toString(),
+				            		"",
+				            		pt.count_nodes(0, this.getExclude_grammars()),
+				            		pt.count_leafes(),
+				            		state, 
+				            		null, 
+				            		"ADDED RULE <ANYCHARSP>", 
+				            		pt, 
+				            		this.getCurr_pl(),
+				            		this.getParsed_data_type());
+					}
+				}
+			}
+		}
+		return pss;
+	}
+
 	private void addMinimalInputToList(ParsedStringSettings pss) {
 		if(pss != null) {
 			this.getListForEasiestMod().add(pss);
@@ -372,9 +454,9 @@ public class Fuzzer {
     		for(ParseTree pt : lst) {
     			if(pt != null) {
     				// Parsed successfully using the adjusted grammar
-    	    		if(this.log) {
-    	    			System.out.println("String " + created_string + " successfully parsed using the adjusted golden grammar");
-    				}
+//    	    		if(this.log) {
+//    	    			System.out.println("String " + created_string + " successfully parsed using the adjusted golden grammar");
+//    				}
     	    		// Add to return list
     	    		pt_list.add(pt);
     			}
@@ -440,9 +522,9 @@ public class Fuzzer {
     	    		pt_list.add(pt);
     			}
     		}
-    		if(this.log && lst.size() > 0) {
-    			System.out.println("String " + created_string + " successfully parsed using the adjusted golden grammar");
-			}
+//    		if(this.log && lst.size() > 0) {
+//    			System.out.println("String " + created_string + " successfully parsed using the adjusted golden grammar");
+//			}
         	return pt_list;
 		} catch (Exception e) {
   			if(this.log) {
@@ -451,131 +533,6 @@ public class Fuzzer {
 			return null;
 		}
 	
-	}
-
-	/*
-	 * Given a ParseTree, this method will identify and remove the
-	 * <anychar/s/p> characters within the string. The thus minimized 
-	 * string will then be checked again (can we still parse the string
-	 * using the adjusted grammar rule?). 
-	 * Returns: A new minimized ParseTree
-	 * 
-	 * */
-	private ParsedStringSettings identifiyAndRemoveAnycharChars(ParseTree result, String created_string, String state, HashMap<String, GDef> master, int gRuleC, int elemC, Entry<String, GDef> entry, GRule anycharsp) {
-		ParsedStringSettings pss = null;
-		StringBuilder sb_created_string = new StringBuilder(created_string);
-		// As the given tree might have multiple sequences of <anychars>, we have to loop over until there is no character left that has been represented by an anychar tag
-		String anychars = result.print_tree_anychar_chars();
-		int anychars_length;
-		int pos;
-		int removed_chars = 0;
-		StringBuilder removed_chars_from_string = new StringBuilder("");
-		// Initialize for the first iteration in while(){...}
-		HashMap<Integer, Integer> pos_length_lst = result.getMapOfPosStringAnychar();
-		Map<Integer, Integer> sorted_pos_length_lst = new TreeMap<Integer, Integer>(pos_length_lst);
-		int counter = 0;
-		for(Map.Entry<Integer, Integer> pos_length : sorted_pos_length_lst.entrySet()) {
-//			System.out.println("Key: " + pos_length.getKey() + " Value: " + pos_length.getValue());
-			pos = pos_length.getKey();
-			pos -= removed_chars; // We take the length of characters, that have already been removed into account
-			anychars_length = pos_length.getValue();
-			if(this.log) {
-				System.out.printf("Starting position to remove characters from: %d\nLength: %d\n", pos, anychars_length);
-			}
-			for(int i = 0; i < anychars_length; i++) { // Can not use normal delete as there a strange behavior when start = end (then nothing will be deleted))
-				try {
-//					System.out.println("Lenght of the current string: " + sb_created_string.length());
-					removed_chars_from_string.append(sb_created_string.charAt(pos));
-//					System.out.println("Removed char");
-					sb_created_string.deleteCharAt(pos); // Delete the character at position POS anychars_length-times
-					if(this.log) {
-						System.out.printf("Removed %s from %s\n", removed_chars_from_string.charAt(counter), sb_created_string);
-					}
-					counter += 1;
-				} catch (Exception e) {
-					System.out.printf("Exception: %s\nPos: %d, Removed chars: %d, anychars_length: %d\nremoved_chars_from_string: %s\nsb_created_string: %s",
-							e.toString(), pos, removed_chars, anychars_length, removed_chars_from_string.toString(), sb_created_string.toString());
-				}
-				
-			}
-			removed_chars += anychars_length;
-			// Get new data 
-			if(this.log) {
-				System.out.println(String.format("String representing through <anychar>: %s\n"
-						+ "Anychar string starting at position: %d\nLength of removed sequence: %d\n"
-						+ "String after removing those characters: %s\n", 
-						removed_chars_from_string, pos, anychars_length, sb_created_string));
-			}
-		}
-		if(this.log) {
-			if(sb_created_string.toString().equals("")) {
-				System.out.printf("Finished removing characters that have been displayed using <anychar> blocks.\nString before removing: %s\nString after removing those characters: %s\n",
-						created_string, "EMPTY STRING");
-			}
-			else {
-				System.out.printf("Finished removing characters that have been displayed using <anychar> blocks.\nString before removing: %s\nString after removing those characters: %s\n",
-						created_string, sb_created_string);
-			}
-		}
-		// Check if the string is an empty string
-		if(sb_created_string.toString().equals("")) {
-			return null;
-		}
-		
-		// Check if the string without anychar-chars will be rejected by the golden grammar and accepted by the adjusted golden grammar
-		// Differentiate between anychar and anycharsp (gRuleC and elemC = -1)
-		if(!(gRuleC == -1 && elemC == -1)) {
-			    pss = new ParsedStringSettings(
-	            		created_string,
-	            		sb_created_string.toString(),
-	            		"",
-	            		result.count_nodes(0, this.getExclude_grammars()),
-	            		result.count_leafes(),
-	            		state, 
-	            		entry.getValue().get(gRuleC), 
-	            		entry.getValue().get(gRuleC).get(elemC), 
-	            		result, 
-	            		this.getCurr_pl());
-		}
-		else { // <Anycharsp>
-	            pss = new ParsedStringSettings(
-	            		created_string,
-	            		sb_created_string.toString(),
-	            		"",
-	            		result.count_nodes(0, this.getExclude_grammars()),
-	            		result.count_leafes(),
-	            		state, 
-	            		null, 
-	            		"ADDED RULE <ANYCHARSP>", 
-	            		result, 
-	            		this.getCurr_pl());
-		}
-		if(this.log) {
-			System.out.println("Finished removing characters that are being represented by <anychar> blocks for " + pss.hashCode());
-		}
-		return pss;
-	}
-	
-	/*
-	 * Checks if the given string could be parsed using the golden grammar
-	 * Returns true if the string was parsed successfully
-	 * Otherwise returns false
-	 * */
-	private boolean successfullyParsedUsingGoldenGrammar(String adjusted_string) {
-		try {
-			// ParseTree result = this.getGolden_grammar_PL().parse_string(adjusted_string, this.getGolden_grammar_EP());
-			ParseTree pt =  this.getGolden_grammar_PL().check_string(adjusted_string, this.getGolden_grammar_EP());
-			if(pt != null) {
-				System.out.println("Successfully parsed the string " + adjusted_string + " using the golden grammar...");
-				return true;
-			}
-			return false;
-		} catch (Exception e) {
-			if(this.log) {
-				System.out.println("Golden grammar could not parse " + adjusted_string + " successfully");
-			}
-			return false;
-		}
 	}
 
 	private String generate(boolean log_level) {
@@ -595,7 +552,14 @@ public class Fuzzer {
 			char character = get_next_char(log_level); // Get a new character from the list "char_set" 
 			setGeneratedChar(character);
 			setCurrent_str(getPrevious_str() + character); // Concatenate the previous string with the generated character
-			validate_json(getCurrent_str(), log_level); // Try to validate the current string (current_str)
+			// Check if the string is about to become an array (starting with '[') or an object (starting with '{')
+			if(getCurrent_str().startsWith("[")) {
+				this.setParsed_data_type("ARRAY");
+				validate_json_array(getCurrent_str(), log_level); // Try to validate the current string (current_str)
+			} else {
+				this.setParsed_data_type("OBJECT");
+				validate_json_object(getCurrent_str(), log_level); // Try to validate the current string (current_str)
+			}
 			// System.exit(0);
 			if(log_level) {
 				System.out.format("%s n=%d, c=%s. Input string was %s", rv, n, c, getCurrent_str());
@@ -603,7 +567,7 @@ public class Fuzzer {
 			if(getRv().equals(complete)) { // Return if complete
 				return getCurrent_str();
 			}
-			else if(getCurrent_str().length() >= MAX_INPUT_LENGTH) { // Unlikely that a string with a size of >1500 characters will end in a valid string
+			else if(getCurrent_str().length() >= MAX_INPUT_LENGTH) { // Unlikely that a string with a size of >MAX_INPUT_LENGTH characters will end in a valid string
 				// => reset 
 				setCurrent_str(""); //TODO Code duplication => create a new method
 				setPrevious_str("");
@@ -616,7 +580,6 @@ public class Fuzzer {
 			else if(getRv().equals(incomplete)) { // The current string was incomplete; something is missing
 				setPrevious_str(getCurrent_str());
 				refill_character_list(log_level);
-				// prev_str = curr_str;
 				continue;
 			}
 			else if(getRv().equals(wrong)) { // The current string was wrong; don't concatenate the generated character to the previous string
@@ -629,7 +592,8 @@ public class Fuzzer {
 		}
 		return null;
 	}
-	private void validate_json(String input_str, boolean log_level) {
+
+	private void validate_json_object(String input_str, boolean log_level) {
 		/* Tries to validate the given input_str; handles error accordingly
 		 * sets:
 		 * rv: "complete", "incomplete" or "wrong", 
@@ -648,22 +612,8 @@ public class Fuzzer {
 			setRv(complete); // Set the return value to complete
 		} catch (Exception e) {
 			String msg = e.toString();			
-			// Optional: Save the error message as well as the input_str that produced the error message
 			ArrayList<Integer> numbers = getNumbersFromErrorMessage(msg);
-			if(msg.contains(text_must_begin_with)) {
-				ArrayList<String> value = errors.get(text_must_begin_with);
-				if(value == null) {
-					ArrayList<String> new_value = new ArrayList<String>();
-					new_value.add(input_str);
-					errors.put(text_must_begin_with, new_value);
-				}
-				else { // Error already exists
-					// Insert new element in ArrayList
-					// but only if the input_str is not already within the ArrayList
-					if(!value.contains(input_str)) {
-						value.add(input_str);
-					}
-				}
+			if(msg.contains(text_must_begin_with)) { // Should never be the case after the program flow adjustment
 				rv = "wrong";
 				if(input_str.equals("")) {
 					c = null;
@@ -680,46 +630,14 @@ public class Fuzzer {
 				
 			}
 			else if (msg.contains(text_must_end_with)) {
-				ArrayList<String> value = errors.get(text_must_end_with);
-				if(value == null) {
-					ArrayList<String> new_value = new ArrayList<String>();
-					new_value.add(input_str);
-					errors.put(text_must_end_with, new_value);
-				}
-				else {
-					if(!value.contains(input_str)) {
-						value.add(input_str);
-					}
-				}
 				n = numbers.get(0) - 1;
 				if(getGeneratedChar() == 0) {
 					n++;
 				}
 				rv = "incomplete";
 				c = null;
-//				if(n >= input_str.length()) {
-//					rv = "incomplete";
-//					c = null;
-//				}
-//				else {
-//					System.out.println(e.toString());
-//					System.out.println("SOMETHING WENT WRONG");
-//					System.exit(0);
-//				}
-				
 			}
 			else if (msg.contains(expected_a)) {
-				ArrayList<String> value = errors.get(expected_a);
-				if(value == null) {
-					ArrayList<String> new_value = new ArrayList<String>();
-					new_value.add(input_str);
-					errors.put(expected_a, new_value);
-				}
-				else {
-					if(!value.contains(input_str)) {
-						value.add(input_str);
-					}
-				}
 				n = numbers.get(0)-1;
 				if(n >= input_str.length()) {
 					rv = incomplete;
@@ -732,34 +650,12 @@ public class Fuzzer {
 				
 			}
 			else if (msg.contains(unterminated_string)) {
-				ArrayList<String> value = errors.get(unterminated_string);
-				if(value == null) {
-					ArrayList<String> new_value = new ArrayList<String>();
-					new_value.add(input_str);
-					errors.put(unterminated_string, new_value);
-				}
-				else {
-					if(!value.contains(input_str)) {
-						value.add(input_str);
-					}
-				}
 				n = -1;
 				rv = incomplete;
 				c = null;
 				
 			}
 			else if (msg.contains(missing_value)) {
-				ArrayList<String> value = errors.get(missing_value);
-				if(value == null) {
-					ArrayList<String> new_value = new ArrayList<String>();
-					new_value.add(input_str);
-					errors.put(missing_value, new_value);
-				}
-				else { 
-					if(!value.contains(input_str)) {
-						value.add(input_str);
-					}
-				}
 				n = numbers.get(0);
 				if(n >= input_str.length()) {
 					rv = incomplete;
@@ -772,34 +668,107 @@ public class Fuzzer {
 				
 			}
 			else if (msg.contains(illegal_escape)) {
-				ArrayList<String> value = errors.get(illegal_escape);
-				if(value == null) {
-					ArrayList<String> new_value = new ArrayList<String>();
-					new_value.add(input_str);
-					errors.put(illegal_escape, new_value);
-				}
-				else {
-					if(!value.contains(input_str)) {
-						value.add(input_str);
-					}
-				}
 				n = -1;
 				rv = wrong;
 				c = null; 
 				
 			}
 			else if (msg.contains(duplicate_key)) {
-				ArrayList<String> value = errors.get(duplicate_key);
-				if(value == null) {
-					ArrayList<String> new_value = new ArrayList<String>();
-					new_value.add(input_str);
-					errors.put(duplicate_key, new_value);
+				n = -1;
+				rv = wrong;
+				c = null;
+				
+			}
+			
+			else {
+				// Something went wrong
+				System.out.println("Unknown error; exit program");
+				System.exit(0);
+			}
+		}
+	}
+	
+	private void validate_json_array(String input_str, boolean log_level) {
+		/* Tries to validate the given input_str; handles error accordingly
+		 * sets:
+		 * rv: "complete", "incomplete" or "wrong", 
+		 * n: the index of the character -1 if not applicable
+		 * c: the character where error happened  "" if not applicable
+		 * */
+		try {
+			// input_str = "";
+			if(log_level) {
+				System.out.println("Try input: " + input_str);	
+			}
+			JSONArray obj = new JSONArray(input_str); // Try to parse the input_str
+			if(log_level) {
+				System.out.println("Found valid input: " + input_str);	
+			}
+			setRv(complete); // Set the return value to complete
+		} catch (Exception e) {
+			String msg = e.toString();			
+			ArrayList<Integer> numbers = getNumbersFromErrorMessage(msg);
+			if(msg.contains(text_must_begin_with_array)) {
+				rv = "wrong";
+				if(input_str.equals("")) {
+					c = null;
+				}
+				else if(special_char.contains((int) getGeneratedChar())) { // Check if the last generated character is a special character
+					n = numbers.get(0)-2; // 
+					c = input_str.charAt(n);
 				}
 				else {
-					if(!value.contains(input_str)) {
-						value.add(input_str);
-					}
+					n = numbers.get(0)-1;
+					c = input_str.charAt(n);
 				}
+				
+				
+			}
+			else if (msg.contains(text_must_end_with_array)) {
+				n = numbers.get(0) - 1;
+				if(getGeneratedChar() == 0) {
+					n++;
+				}
+				rv = "incomplete";
+				c = null;
+			}
+			else if (msg.contains(expected_a)) {
+				n = numbers.get(0)-1;
+				if(n >= input_str.length()) {
+					rv = incomplete;
+					c = null;
+				}
+				else {
+					rv = wrong;
+					c = input_str.charAt(n);
+				}
+				
+			}
+			else if (msg.contains(unterminated_string)) {
+				n = -1;
+				rv = incomplete;
+				c = null;
+				
+			}
+			else if (msg.contains(missing_value)) {
+				n = numbers.get(0);
+				if(n >= input_str.length()) {
+					rv = incomplete;
+					c = null;
+				}
+				else {
+					rv = wrong;
+					c = input_str.charAt(n);
+				}
+				
+			}
+			else if (msg.contains(illegal_escape)) {
+				n = -1;
+				rv = wrong;
+				c = null; 
+				
+			}
+			else if (msg.contains(duplicate_key)) {
 				n = -1;
 				rv = wrong;
 				c = null;
@@ -837,8 +806,8 @@ public class Fuzzer {
 		 * (depending on which printable is used)
 		 * */
 		ArrayList<Character> tmp_char_set = new ArrayList<Character>();
-		char[] set_of_chars = printable_with_special_characters();
-		// char[] set_of_chars = printable();
+//		char[] set_of_chars = printable_with_special_characters();
+		char[] set_of_chars = printable();
 		for(char c : set_of_chars) {
 			tmp_char_set.add(c);
 		}
@@ -884,7 +853,7 @@ public class Fuzzer {
     	char[] result = new char[128]; 
         for(int i = 0; i<=127; i++){
         	// Exclude special characters json can not handle (00, 0D, 0A)
-        	if (!(i == 0 || i == 13 || i == 10)) {
+        	if (!(i == 0 || i == 13 || i == 10)) { // TODO Limitation
         		result[i] = (char) i;
         	}
         }
@@ -942,12 +911,6 @@ public class Fuzzer {
 	}
 	public void setPrevious_str(String previous_str) {
 		this.previous_str = previous_str;
-	}
-	public Map<String, ArrayList<String>> getErrors() {
-		return errors;
-	}
-	public void setErrors(Map<String, ArrayList<String>> errors) {
-		this.errors = errors;
 	}
 	public String getText_must_begin_with() {
 		return text_must_begin_with;
@@ -1054,5 +1017,11 @@ public class Fuzzer {
 	}
 	public void setGolden_grammar_EP(EarleyParser golden_grammar_EP) {
 		this.golden_grammar_EP = golden_grammar_EP;
+	}
+	public String getParsed_data_type() {
+		return parsed_data_type;
+	}
+	public void setParsed_data_type(String parsed_data_type) {
+		this.parsed_data_type = parsed_data_type;
 	}
 }
