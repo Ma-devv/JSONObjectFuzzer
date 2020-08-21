@@ -118,9 +118,10 @@ public class ParsedStringSettings {
 			System.out.println("");
 		}
 		String ras = this.getRemoved_anychar_string().equals("") ? "Empty string" : this.getRemoved_anychar_string(); 
-		String result = String.format("ID: %s\nString: %s\nString after removing characters represented using <anychar>: %s\nMinimized string using HDD: %s\nAdjusted rule: %s\n"
-									+ "Adjusted token: %s\nAdjusted element: %s\nTree size: %d\nTree:\n%s\nLeaf size: %d\n",
+		String result = String.format("ID: %s\nObject: %s\nString: %s\nString after removing characters represented using <anychar>: %s\nMinimized string using HDD: %s\nAdjusted rule: %s\n"
+									+ "Adjusted token: %s\nAdjusted element: %s\nTree size: %d\nTree:\n%s\nAbstracted Tree:\n%s\nLeaf size: %d\n",
 				this.hashCode(),
+				this.getData_type(),
 				this.getCreated_string(), // Created string
 				ras, // String after removing <anychar> parts
 				this.getHdd_string(), // Minimized string using hdd
@@ -129,6 +130,7 @@ public class ParsedStringSettings {
 				this.getChanged_elem(), // Adjusted Element
 				this.getTree_size(), // Tree size 
 				this.getTree().tree_to_string(), // Tree
+				this.getTree().abstract_tree_to_string(),
 				this.getLeaf_size()); // Leaf size
 //		String result = String.format("String: %s\nString after removing characters represented using <anychar>: %s\nMinimized string using HDD: %s\n",
 //				this.getCreated_string(), // Created string

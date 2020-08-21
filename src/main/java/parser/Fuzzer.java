@@ -10,6 +10,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.concurrent.ThreadLocalRandom;
 
 import org.json.JSONArray;
@@ -63,13 +64,17 @@ public class Fuzzer {
 	private Grammar anychar_grammar;
 	private ArrayList<ParsedStringSettings> listForEasiestMod = new ArrayList<ParsedStringSettings>();
 	
+	// Simple DDSET
+	private HashMap<String, ArrayList<ParseTree>> dd_random_trees = new HashMap<String, ArrayList<ParseTree>>();
+	private HashSet<ParseTree> dd_random_trees_set_check = new HashSet<ParseTree>();
+	
 	private boolean log = true;
-	private final int MAX_INPUT_LENGTH = 100; // Sets the maximal input length when creating a string
+	private final int MAX_INPUT_LENGTH = 20; // Sets the maximal input length when creating a string
 	private HashSet<String> exclude_grammars = new HashSet<>(Arrays.asList("<anychar>", "<anychars>", "<anycharsp>", "<anycharp>"));
 	public static void main(String[] args) {
 		Fuzzer fuzzer = new Fuzzer("", 0, null, args[0], null); // Create new Fuzzer; initialize grammar
 		try {
-			fuzzer.create_valid_strings(50, fuzzer.log); // Create 20 valid strings; no log level enabled
+			fuzzer.create_valid_strings(3, fuzzer.log); // Create 20 valid strings; no log level enabled
 			// Print out the strings that have been found
 			for(Map.Entry<String, ArrayList<String>> entry : fuzzer.getValid_strings().entrySet()) {
 				String key = entry.getKey();
@@ -82,6 +87,32 @@ public class Fuzzer {
 		} catch (Exception e) {
 			System.out.println("Something went wrong...\nError: " + e);
 			System.exit(1);
+		}
+		
+	}
+
+	private void createRandomTrees(int i) {
+		// Filles the list for SimpleDDSET
+		// Temporarily
+		ArrayList<String> tmp = new ArrayList<String>();
+		tmp.add("{\"as\": 1}");
+		tmp.add("{true}");
+		tmp.add("{\"-asdöasd\": \"alöksdqdq\"}");
+		tmp.add("{\"112\":true}");
+		tmp.add("{}");
+		tmp.add("[1,2,3,4,5,6]");
+		tmp.add("[true, false, {}, 1, 2]");
+		tmp.add("[{}]");
+		tmp.add("[]");
+		tmp.add("[[], 1, 2, [1,2,3]]");
+		for(String s : tmp) {
+			try {
+				for(ParseTree p : this.getCurr_pl().parse_string(s, this.getCurr_ep())) {
+					addElementsOfParseTreeToRandomList(p, "");
+				}
+			} catch (Exception e) {
+				
+			}
 		}
 		
 	}
@@ -110,6 +141,7 @@ public class Fuzzer {
 		int i = 0;
 		while (true) {
 			initializeGoldenGrammar();
+			createRandomTrees(10);
 			String created_string = generate(log_level); // Generate a new valid JSON Object, according to org.json.JSONObject
 			if(created_string != null) {
 				// Check if the created string is also valid according to the "golden grammar"
@@ -140,6 +172,7 @@ public class Fuzzer {
 		            // Change the golden grammar until the string can be parsed
 		        	// System.out.println("Failed by the GG " + e.toString());
 		        	change_everything_except_anychar_one_after_another(created_string);
+		        	i++;
 		        	// Now we try to get the smallest input that is causing the error/exception
 		        	// TODO
 		        	System.out.println("\n");
@@ -149,6 +182,18 @@ public class Fuzzer {
 					break;
 				}
 			}
+		}
+		// Simple DDSET
+		SimpleDDSET sddset = new SimpleDDSET();
+		for(Map.Entry<String, ArrayList<ParseTree>> entry : dd_random_trees.entrySet()) {
+			System.out.printf("\nState: %s, Amount of trees for randomness: %d\n", entry.getKey(), entry.getValue().size());
+		}
+		
+		
+   		// Sort the list
+		Collections.sort(this.getListForEasiestMod(), new ParsedStringSettingsComparator());
+		for(ParsedStringSettings pss : this.getListForEasiestMod()) {
+			sddset.abstractTree(pss, getExclude_grammars(), dd_random_trees);
 		}
 	}
 	
@@ -214,7 +259,7 @@ public class Fuzzer {
                 			ParsedStringSettings pss = getBestTree(result_lst, created_string, state, master, gRuleC, elemC, entry, null);
                 			if(pss != null) {
                 	            HDD hdd = new HDD();
-                	            hdd.startHDD(pss, this.getExclude_grammars(), this.getGolden_grammar_PL(), this.getGolden_grammar_EP(), this.log);;
+                	            hdd.startHDD(pss, this.getExclude_grammars(), this.getGolden_grammar_PL(), this.getGolden_grammar_EP(), this.log);
                 	            addMinimalInputToList(pss);
                     		}
                     		else {
@@ -261,20 +306,13 @@ public class Fuzzer {
     	if(true) {
     		System.out.println("\n\nDone with adjusting the grammar for " + created_string + "\n\n");
 		}
-    	if(true) {
-    		// Sort the list
-    		Collections.sort(this.getListForEasiestMod(), new ParsedStringSettingsComparator());
-    		for(ParsedStringSettings pss : this.getListForEasiestMod()) {
-    			System.out.println(pss);
-    		}
-    	}
-    	System.exit(0);
 	}
 	
 	private ParsedStringSettings getBestTree(ArrayList<ParseTree> result_lst, String created_string, String state, HashMap<String, GDef> master, int gRuleC, int elemC, Entry<String, GDef> entry, GRule anycharsp) {
 		ParsedStringSettings pss = null;
 		System.out.printf("Original string: %s\tLength %d\n", created_string, created_string.length());
 		for(ParseTree pt : result_lst) {
+			// addElementsOfParseTreeToRandomList(pt, state);
 			// As the given tree might have multiple sequences of <anychars>, we have to loop over until there is no character left that has been represented by an anychar tag
 			StringBuilder sb_created_string = new StringBuilder(created_string);
 			int anychars_length;
@@ -379,6 +417,29 @@ public class Fuzzer {
 			}
 		}
 		return pss;
+	}
+
+	private void addElementsOfParseTreeToRandomList(ParseTree pt, String state) {
+		// Add each subtree of the tree to the Simple DDSET list except the nodes that equal the state as the rule is adjusted
+		if(!pt.name.equals(state) && !exclude_grammars.contains(pt.name) && pt.is_nt()) { // Check if the current name equals state
+			if(this.getDd_random_trees().containsKey(pt.name)) { // Check if we there is already an element for the tree name
+				if(!this.getDd_random_trees_set_check().contains(pt)) {
+					this.getDd_random_trees_set_check().add(pt);
+					this.getDd_random_trees().get(pt.name).add(pt); // If so, add the ParseTree to the Set
+				}
+			} else { // If not, create one and add the tree
+				ArrayList<ParseTree> pt_lst = new ArrayList<ParseTree>();
+				pt_lst.add(pt);
+				this.getDd_random_trees_set_check().add(pt);
+				this.getDd_random_trees().put(pt.name, pt_lst);
+			}
+		}
+		for(ParseTree p : pt.children) {
+			HashSet<String> tmp = new HashSet<String>();
+			if(p.count_nodes(0, tmp) > 4) {
+				addElementsOfParseTreeToRandomList(p, state);
+			}
+		}		
 	}
 
 	private void addMinimalInputToList(ParsedStringSettings pss) {
@@ -629,7 +690,7 @@ public class Fuzzer {
 				
 				
 			}
-			else if (msg.contains(text_must_end_with)) {
+			else if (msg.contains(text_must_end_with) || msg.contains(text_must_end_with_array)) {
 				n = numbers.get(0) - 1;
 				if(getGeneratedChar() == 0) {
 					n++;
@@ -682,7 +743,7 @@ public class Fuzzer {
 			
 			else {
 				// Something went wrong
-				System.out.println("Unknown error; exit program");
+				System.out.println("Unknown error; exit program: " + msg);
 				System.exit(0);
 			}
 		}
@@ -724,7 +785,7 @@ public class Fuzzer {
 				
 				
 			}
-			else if (msg.contains(text_must_end_with_array)) {
+			else if (msg.contains(text_must_end_with_array) || msg.contains(text_must_end_with)) {
 				n = numbers.get(0) - 1;
 				if(getGeneratedChar() == 0) {
 					n++;
@@ -777,7 +838,7 @@ public class Fuzzer {
 			
 			else {
 				// Something went wrong
-				System.out.println("Unknown error; exit program");
+				System.out.println("Unknown error; exit program: " + msg);
 				System.exit(0);
 			}
 		}
@@ -1023,5 +1084,17 @@ public class Fuzzer {
 	}
 	public void setParsed_data_type(String parsed_data_type) {
 		this.parsed_data_type = parsed_data_type;
+	}
+	public HashMap<String, ArrayList<ParseTree>> getDd_random_trees() {
+		return dd_random_trees;
+	}
+	public void setDd_random_trees(HashMap<String, ArrayList<ParseTree>> dd_random_trees) {
+		this.dd_random_trees = dd_random_trees;
+	}
+	public HashSet<ParseTree> getDd_random_trees_set_check() {
+		return dd_random_trees_set_check;
+	}
+	public void setDd_random_trees_set_check(HashSet<ParseTree> dd_random_trees_set_check) {
+		this.dd_random_trees_set_check = dd_random_trees_set_check;
 	}
 }

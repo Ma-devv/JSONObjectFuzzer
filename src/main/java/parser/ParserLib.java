@@ -167,6 +167,8 @@ class ParseTree {
     ArrayList<ParseTree> children;
     private boolean indented_nt = false; // TODO change - howto?
     private boolean anychar_seen_gpofa = false; // TODO change GPOFA: getPosOfFristAnychar()
+    private boolean abstracted = false;
+    
     public ParseTree(String name, ArrayList<ParseTree> children) {
         this.name = name;
         this.children = children;
@@ -186,6 +188,7 @@ class ParseTree {
     	for(ParseTree pt_source : source.children) {
     		this.children.add(new ParseTree(pt_source));
     	}
+    	this.abstracted = source.abstracted;
     }
     
     private int _count_leafes(ParseTree tree, int nodeCount) {
@@ -341,6 +344,18 @@ class ParseTree {
 
     public String tree_to_string() {
     	return this._tree_to_string(0, "");
+    }
+    
+    private String _abstract_tree_to_string(int indent, String tree) {
+    	tree += "   ".repeat(indent) + this.name + "\tA: " + this.isAbstracted();
+        for (ParseTree p : this.children) {
+            tree = p._abstract_tree_to_string(indent + 1, tree + "\n");
+        }
+        return tree;
+    }
+
+    public String abstract_tree_to_string() {
+    	return this._abstract_tree_to_string(0, "");
     }
     
 	private int _getPosOfFirstAnychar(ParseTree pt, int counter) {
@@ -545,30 +560,65 @@ class ParseTree {
      * */
     public void replaceTreeNode(ParseTree biggest_node, ParseTree subtree_target, boolean log) {
     	// Call replaceTreeNode recursive as long as the given subtree matches the subtree of the targetTree
-//    	System.out.printf("\nCurrent node (%d):\n%s\n", this.hashCode(), this.tree_to_string());
+    	System.out.printf("\nCurrent node (%d):\n%s\n", this.hashCode(), this.tree_to_string());
     	if(this.hashCode() == biggest_node.hashCode() && this.name.equals(biggest_node.name)) {
-//    		if(log) {
-//    			System.out.println("Replaced " + this.name + ":\n" + this.tree_to_string());
-//    		}
+    		if(log) {
+    			System.out.println("Replaced " + this.name + ":\n" + this.tree_to_string());
+    		}
     		this.children = subtree_target.children;
-//    		if(log) {
-//    			System.out.println("Through\n" + subtree_target.tree_to_string());
-//    		}
+    		if(log) {
+    			System.out.println("Through\n" + subtree_target.tree_to_string());
+    		}
     	}
     	for(ParseTree pt : this.children) {
     		pt.replaceTreeNode(biggest_node, subtree_target, log);
     	}
     }
 
-	@Override
-	public int hashCode() {
-		// We need to adjust the hashCode() as we need something to compare 
-		// two objects during HDD (equals not possible due to deep copy)
-		return this.count_leafes() + this.getTerminals().hashCode();
+//	@Override
+//	public int hashCode() {
+//		// We need to adjust the hashCode() as we need something to compare 
+//		// two objects during HDD (equals not possible due to deep copy)
+//		return this.count_leafes() + this.getTerminals().hashCode();
+//	}
+
+    
+    public ParseTree replaceTreeNodeWithPath(ParseTree main_tree, ParseTree replacement, ArrayList<Integer> path, int path_counter) {
+    	try {
+    		if(path.size() == path_counter) {
+    			// Replace tree
+    			this.children = replacement.children;
+        		return main_tree;
+        	}
+        	
+    		int pos = path.get(path_counter);
+    		this.children.get(pos).replaceTreeNodeWithPath(main_tree, replacement, path, path_counter + 1);
+		} catch (Exception e) {
+			System.out.println("Error replaceTreeNodeWithPath: " + e.toString());
+		}
+    	
+    	return null;
+    }
+    
+    public ParseTree getParseTreeForPath(ArrayList<Integer> path, int path_counter) {
+    	// Given a path, this method will return the children at the position of the path
+    	if(path.size() == path_counter) {
+    		return this;
+    	}
+    	int pos = path.get(path_counter);
+    	return this.children.get(pos).getParseTreeForPath(path, path_counter + 1);
+    }
+    
+    
+    
+	public boolean isAbstracted() {
+		return abstracted;
 	}
-    
-    
-    
+
+	public void setAbstracted(boolean abstracted) {
+		this.abstracted = abstracted;
+	}
+	
 }
 
 class ParseForest implements Iterable<ParseTree> {
