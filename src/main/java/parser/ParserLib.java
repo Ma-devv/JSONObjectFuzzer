@@ -14,7 +14,9 @@ import org.json.*;
 
 import jdk.internal.org.jline.terminal.Terminal;
 
+import java.awt.Choice;
 import java.io.IOException;
+import java.lang.reflect.Array;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
@@ -162,7 +164,7 @@ class G {
 }
 // Parser.py
 
-class ParseTree {
+class ParseTree implements Iterator<ParseTree>{
     String name;
     ArrayList<ParseTree> children;
     private boolean indented_nt = false; // TODO change - howto?
@@ -189,6 +191,37 @@ class ParseTree {
     		this.children.add(new ParseTree(pt_source));
     	}
     	this.abstracted = source.abstracted;
+    }
+        
+    private String _tree_to_string_line(String s) {
+    	s += "'" + this.name + "', ";
+    	for(ParseTree p : this.children) {
+    		s += "[";
+    		s += p._tree_to_string_line("");
+    		s += "]";
+    	}
+    	if(this.children.size() == 0) {
+    		s += "[]";
+    	}
+    	return s;
+    }
+    
+    
+    
+    @Override
+	public boolean hasNext() {
+		// TODO Auto-generated method stub
+		return false;
+	}
+
+	@Override
+	public ParseTree next() {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	public String tree_to_string_line() {
+    	return "(" + this._tree_to_string_line("") + ")";
     }
     
     private int _count_leafes(ParseTree tree, int nodeCount) {
@@ -497,6 +530,8 @@ class ParseTree {
 	 * 
 	 * */
 	public HashMap<Integer, Integer> getMapOfPosStringAnychar() {
+		setAnycharSeen(this, false);
+		setCurrentlySeenAnychar(this, 0);
 //		System.out.println(this.tree_to_string());
 		HashMap<Integer, Integer> result = new HashMap<Integer, Integer>();
 		int amount_of_seen_anychar = 0;
@@ -520,7 +555,14 @@ class ParseTree {
 		return result;
 	}
 	
-    private void setAnycharSeen(ParseTree master, boolean value) {
+    private void setCurrentlySeenAnychar(ParseTree parseTree, int i) {
+		parseTree.currently_seen_anychars = i;
+		for(ParseTree pt : parseTree.children) {
+			setCurrentlySeenAnychar(pt, i);
+		}
+		
+	}
+	private void setAnycharSeen(ParseTree master, boolean value) {
     	master.anychar_seen_gpofa = value;
 		for(ParseTree pt : master.children) {
 			setAnycharSeen(pt, value);
@@ -560,14 +602,14 @@ class ParseTree {
      * */
     public void replaceTreeNode(ParseTree biggest_node, ParseTree subtree_target, boolean log) {
     	// Call replaceTreeNode recursive as long as the given subtree matches the subtree of the targetTree
-    	System.out.printf("\nCurrent node (%d):\n%s\n", this.hashCode(), this.tree_to_string());
+//    	System.out.printf("\nCurrent node (%d):\n%s\n", this.hashCode(), this.tree_to_string());
     	if(this.hashCode() == biggest_node.hashCode() && this.name.equals(biggest_node.name)) {
     		if(log) {
-    			System.out.println("Replaced " + this.name + ":\n" + this.tree_to_string());
+//    			System.out.println("Replaced " + this.name + ":\n" + this.tree_to_string());
     		}
     		this.children = subtree_target.children;
     		if(log) {
-    			System.out.println("Through\n" + subtree_target.tree_to_string());
+//    			System.out.println("Through\n" + subtree_target.tree_to_string());
     		}
     	}
     	for(ParseTree pt : this.children) {
@@ -617,6 +659,22 @@ class ParseTree {
 
 	public void setAbstracted(boolean abstracted) {
 		this.abstracted = abstracted;
+	}
+	public String tree_to_string_prune() {
+		String s = "";
+		if(this.name.startsWith("<") && this.name.endsWith(">")) {
+			return this.name + ",";
+		}
+		for(ParseTree p : this.children) {
+			s += p.tree_to_string_prune();
+		}
+		return s;
+	}
+	public ParseTree prune_tree_helper(ParseTree pt_copy, EarleyParser ep) {
+		for(ParseTree p : this.children) {
+			pt_copy.children.add(ep.prune_tree(p));
+		}
+		return pt_copy;
 	}
 	
 }
@@ -803,6 +861,8 @@ class EarleyParser extends Parser {
     List<Column> table;
     private boolean log = false;
     private String grammar_key = "<object>";
+	private boolean coalesce_tokens = true;
+	private HashSet<String> tokens = new HashSet<String>();
     
     public String get_grammar_key() {
     	return this.grammar_key;
@@ -1145,6 +1205,53 @@ class EarleyParser extends Parser {
             for p in zip(*ptrees):
                 yield (name, p)
 */
+	public ParseTree prune_tree(ParseTree pt) {
+		String name = pt.name;
+		ArrayList<ParseTree> children = pt.children;
+		System.out.printf("Parsetree: %s\n", pt.tree_to_string_line());
+		if(name == "<>") {
+			assert children.size() == 1;
+			return this.prune_tree(pt.children.get(0));
+		}
+		if(this.coalesce_tokens) {
+			children = this.coalesce(children);
+		}
+		if(this.tokens.contains(pt.name)) {
+			StringBuilder sb = new StringBuilder(pt.tree_to_string_prune());
+			ArrayList<ParseTree> new_child = new ArrayList<ParseTree>();
+			for(int x = 0; x < sb.length(); x++) {
+				new_child.add(new ParseTree(Character.toString(sb.charAt(x)), new ArrayList<ParseTree>()));
+			}
+			return (new ParseTree(name, new_child));
+		} else {
+			ParseTree copy = new ParseTree(pt);
+			pt.prune_tree_helper(copy, this);
+			pt = copy;
+			return pt;
+		}
+	}
+	
+
+	
+	private ArrayList<ParseTree> coalesce(ArrayList<ParseTree> children) {
+		StringBuilder last = new StringBuilder();
+		ArrayList<ParseTree> new_lst = new ArrayList<ParseTree>();
+		for(ParseTree pt : children) {
+			if(!this.grammar.containsKey(pt.name)) {
+				last.append(pt.name);
+			} else {
+				if(last.length() > 0) {
+					new_lst.add(new ParseTree(last.toString(), new ArrayList<ParseTree>()));
+					last = new StringBuilder();
+				}
+				new_lst.add(new ParseTree(pt.name, pt.children));
+			}
+		}
+		if(last.length() > 0) {
+			new_lst.add(new ParseTree(last.toString(), new ArrayList<ParseTree>()));
+		}
+		return new_lst;
+	}
 }
 
 /*
@@ -1370,17 +1477,335 @@ public class ParserLib {
         }
         return null;
     }
+    
+}
+
+class ChoiceNode {
+	private int counter;
+	private ChoiceNode parent;
+	private int total;
+	private int chosen;
+	private ChoiceNode next;
+	
+	@Override
+	public String toString() {
+		return String.format("counter: %d, chosen: %d, total: %d\n", counter, chosen, total);
+	}
+	
+	public ChoiceNode(ChoiceNode parent, int total, int counter) {
+		this.parent = parent;
+		this.counter = counter;
+		this.total = total;
+		this.chosen = 0;
+		this.next = null;
+	}
+	
+	public int chosen() {
+		assert !this.finished();
+		return this.chosen;
+	}
+
+	public ChoiceNode increment() {
+		next = null;
+		if(parent == null) {
+			return null;
+		}
+		setChosen(getChosen() + 1);
+		if(this.finished()) {
+			return parent.increment();
+		}
+		return this;
+	}
+
+	public boolean finished() {
+		// TODO Auto-generated method stub
+		return getChosen() >= getTotal();
+	}
+
+	public int getCounter() {
+		return counter;
+	}
+
+	public void setCounter(int counter) {
+		this.counter = counter;
+	}
+
+	public ChoiceNode getParent() {
+		return parent;
+	}
+
+	public void setParent(ChoiceNode parent) {
+		this.parent = parent;
+	}
+
+	public void setNext(ChoiceNode next) {
+		this.next = next;
+	}
+
+	public int getTotal() {
+		return total;
+	}
+
+	public void setTotal(int total) {
+		this.total = total;
+	}
+
+	public int getChosen() {
+		return chosen;
+	}
+
+	public void setChosen(int chosen) {
+		this.chosen = chosen;
+	}
+
+	public ChoiceNode getNext() {
+		return next;
+	}
 
 }
-                    
-     
-       
-        
-      
-    
-              
-       
-   
-        
-    
-     
+
+class LazyExtractor{
+	private EarleyParser parser;
+	private String text; // input string
+	private ChoiceNode choices;
+	private NamedForest my_forest;
+	private int choose_path_i;
+	private int choose_path_l;
+	int global_counter = 0;
+	
+	
+	public LazyExtractor(EarleyParser parser, String text, ChoiceNode choices) throws ParseException {
+		this.parser = parser;
+		this.text = text;
+		this.choices = choices;
+		
+		
+		ParseForest forest = parser.parse_prefix(text, "<start>");
+	    State start = null;
+        for (State s : forest.states) {
+            if (s.finished()) {
+                start = s;
+            }
+        }
+	    if (forest.cursor < text.length() || (start == null)) {
+	    	// NamedForest forest = this.parse_forest(this.table, start);
+	        throw new ParseException("at " + forest.cursor);
+	    }
+	    this.my_forest = parser.parse_forest(parser.table, start);
+	}
+	
+	public ParseTree extract_a_tree() {
+		choices = new ChoiceNode(null, 1, 0);
+		while(!this.choices.finished()) {
+			HashSet<LETriple> seen = new HashSet<LETriple>();
+			LEReturnTriple ler = extract_a_node(this.my_forest, seen, this.choices, null);
+			choices = ler.getChoicenode();
+			if(ler.getPostree() != null) {
+				return this.parser.prune_tree(ler.getParsetree());
+			} else {
+				ler.getChoicenode().increment();
+			}
+			
+		}
+		return null;
+	}
+
+	private LEReturnTriple extract_a_node(NamedForest forest_node, HashSet<LETriple> seen, ChoiceNode choices, LETriple new_seen_element) {
+		if(new_seen_element != null) {
+			seen.add(new_seen_element);
+		}
+		System.out.printf("\n----------\nseen: %s\nchoices: %s\n", seen.toString(), choices.toString());
+		String name = forest_node.name;
+		ArrayList<ArrayList<TPath>> paths = forest_node.paths;
+		if(paths.size() == 0) {
+			LETriple let = new LETriple(name, 0, 1);
+			LEReturnTriple ler = new LEReturnTriple(new Postree(let, new ArrayList<Postree>()), new ParseTree(name, new ArrayList<ParseTree>()), choices);
+			return ler;
+		}
+		ArrayList<ParseTree> child_nodes;
+		ArrayList<Postree> pos_nodes;
+		int i;
+		int l;
+		while(true) {
+			ChoiceNode new_choices = choose_path(paths, choices);
+			i = this.choose_path_i;
+			l = this.choose_path_l;
+			ArrayList<TPath> curr_path = paths.get(i);
+			if(curr_path == null) {
+				LEReturnTriple ler = new LEReturnTriple(null, null, new_choices);
+				return ler;	
+			}
+			child_nodes = new ArrayList<ParseTree>();
+			pos_nodes = new ArrayList<Postree>();
+			for(int j = 0; j < curr_path.size(); j++) {
+				List<Column> chart = curr_path.get(j).chart;
+				Character kind = curr_path.get(j).sk.k;
+				State s = curr_path.get(j).sk.s;
+				LETriple nid;
+				if(s.s_col == null || s.e_col == null) {
+					nid = new LETriple(s.name, -1, -1);
+				} else {
+					nid = new LETriple(s.name, s.s_col.index, s.e_col.index);
+				}
+				if(seen.contains(nid)) {
+					LEReturnTriple ler = new LEReturnTriple(null, null, new_choices);
+					return ler;
+				}
+				NamedForest f = this.parser.forest(s, kind, chart);
+				System.out.printf("seen: %s\nnid: %s\n", seen, nid);
+				@SuppressWarnings("unchecked")
+				LEReturnTriple result = extract_a_node(f, (HashSet<LETriple>) seen.clone(), new_choices, nid);
+				System.out.printf("%s", result);
+				ChoiceNode newer_choices = result.getChoicenode();
+				if(result.getPostree() == null) {
+					LEReturnTriple ler = new LEReturnTriple(null, null, newer_choices);
+					return ler;
+				}
+				child_nodes.add(result.getParsetree());
+				pos_nodes.add(result.getPostree());
+				new_choices = newer_choices;
+			}
+			choices = new_choices;
+			if(pos_nodes.size() == 0) {
+				LEReturnTriple ler = new LEReturnTriple(null, null, choices);
+				return ler;
+			} else {
+				break;
+			}
+		}
+		LETriple let = new LETriple(name, i, l);
+		LEReturnTriple ler = new LEReturnTriple(new Postree(let, pos_nodes), new ParseTree(name, child_nodes), choices);
+		return ler;
+		
+	}
+	
+	private ChoiceNode choose_path(ArrayList<ArrayList<TPath>> paths, ChoiceNode choices) {
+		int i = 0;
+		if(choices.getNext() != null) {
+			if(choices.getNext().finished()) {
+				paths = null;
+				return choices.getNext();
+			}
+			
+		} else {
+			global_counter++;
+			choices.setNext(new ChoiceNode(choices, paths.size(), global_counter));
+			i = choices.getNext().chosen();
+		}
+		this.choose_path_i = i;
+		this.choose_path_l = paths.size();
+		choices = choices.getNext();
+		return choices;
+	}
+}
+class LETriple{ // Lazy extractor tuple for set seen
+	private String name;
+	private int s_col_index;
+	private int e_col_index;
+	
+	public LETriple(String name, int s_col_index, int e_col_index) {
+		this.name = name;
+		this.s_col_index = s_col_index;
+		this.e_col_index = e_col_index;
+	}
+	
+	@Override
+	public boolean equals(Object obj) {
+		LETriple le = (LETriple) obj;
+		return this.name.equals(le.name) && this.s_col_index == le.s_col_index && this.e_col_index == le.e_col_index;
+	}
+	
+	@Override
+	public String toString() {
+		return String.format("('%s', %d, %d)", name, s_col_index, e_col_index);
+	}
+}
+class LEReturnTriple{
+	private Postree postree;
+	private ParseTree parsetree;
+	private ChoiceNode choicenode;
+	
+	public LEReturnTriple(Postree postree, ParseTree parsetree, ChoiceNode choicenode) {
+		this.postree = postree;
+		this.parsetree = parsetree;
+		this.choicenode = choicenode;
+	}
+
+	public Postree getPostree() {
+		return postree;
+	}
+
+	public void setPostree(Postree postree) {
+		this.postree = postree;
+	}
+
+	public ParseTree getParsetree() {
+		return parsetree;
+	}
+
+	public void setParsetree(ParseTree parsetree) {
+		this.parsetree = parsetree;
+	}
+
+	public ChoiceNode getChoicenode() {
+		return choicenode;
+	}
+
+	public void setChoicenode(ChoiceNode choicenode) {
+		this.choicenode = choicenode;
+	}
+	
+	@Override
+	public String toString() {
+		return String.format("postree: %s\nparsetree: %s\nnewer choices: %s\n", postree.toString(), parsetree.tree_to_string_line(), choicenode);
+	}
+	
+}
+
+class Postree{
+	private LETriple let;
+	private ArrayList<Postree> lst;
+	
+	public Postree(LETriple let, ArrayList<Postree> lst) {
+		this.let = let;
+		this.lst = lst;
+	}
+
+	public LETriple getLet() {
+		return let;
+	}
+
+	public void setLet(LETriple let) {
+		this.let = let;
+	}
+
+	public ArrayList<Postree> getLst() {
+		return lst;
+	}
+
+	public void setLst(ArrayList<Postree> lst) {
+		this.lst = lst;
+	}
+
+	@Override
+	public String toString() {
+		return _toString("");
+	}
+	private String _toString(String s) {
+		s += this.let.toString();
+		for(Postree pos : this.lst) {
+			s += "[" + pos._toString("") + "]";
+		}
+		if(this.lst.size() == 0) {
+			s += ", []";
+		}
+		return s;
+	}
+}
+
+class LETuple{
+	// postree, consisting of a triple and a 
+	private LETriple let;
+	private ArrayList<LETriple> lst;
+	
+}

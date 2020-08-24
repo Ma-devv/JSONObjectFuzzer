@@ -71,6 +71,9 @@ public class Fuzzer {
 	private boolean log = true;
 	private final int MAX_INPUT_LENGTH = 20; // Sets the maximal input length when creating a string
 	private HashSet<String> exclude_grammars = new HashSet<>(Arrays.asList("<anychar>", "<anychars>", "<anycharsp>", "<anycharp>"));
+	
+	
+	// TODO change printable to all characters
 	public static void main(String[] args) {
 		Fuzzer fuzzer = new Fuzzer("", 0, null, args[0], null); // Create new Fuzzer; initialize grammar
 		try {
@@ -141,6 +144,15 @@ public class Fuzzer {
 		int i = 0;
 		while (true) {
 			initializeGoldenGrammar();
+			String text = "12 + a2";
+			try {
+				LazyExtractor le = new LazyExtractor(getGolden_grammar_EP(), text, null);
+				ParseTree p = le.extract_a_tree();
+				System.out.printf("Finished");
+			} catch (ParseException e1) {
+				e1.printStackTrace();
+			}
+			System.exit(0);
 			createRandomTrees(10);
 			String created_string = generate(log_level); // Generate a new valid JSON Object, according to org.json.JSONObject
 			if(created_string != null) {
@@ -260,6 +272,8 @@ public class Fuzzer {
                 			if(pss != null) {
                 	            HDD hdd = new HDD();
                 	            hdd.startHDD(pss, this.getExclude_grammars(), this.getGolden_grammar_PL(), this.getGolden_grammar_EP(), this.log);
+                	            MinimizeAnychar ma = new MinimizeAnychar();
+                	            ma.startDD(pss, getGolden_grammar_EP(), getGolden_grammar_PL());
                 	            addMinimalInputToList(pss);
                     		}
                     		else {
@@ -672,6 +686,7 @@ public class Fuzzer {
 			}
 			setRv(complete); // Set the return value to complete
 		} catch (Exception e) {
+			System.out.printf("Error: %s\n", e.toString());
 			String msg = e.toString();			
 			ArrayList<Integer> numbers = getNumbersFromErrorMessage(msg);
 			if(msg.contains(text_must_begin_with)) { // Should never be the case after the program flow adjustment
@@ -767,6 +782,7 @@ public class Fuzzer {
 			}
 			setRv(complete); // Set the return value to complete
 		} catch (Exception e) {
+			System.out.printf("Error: %s\n", e.toString());
 			String msg = e.toString();			
 			ArrayList<Integer> numbers = getNumbersFromErrorMessage(msg);
 			if(msg.contains(text_must_begin_with_array)) {
