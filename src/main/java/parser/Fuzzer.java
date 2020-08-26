@@ -145,13 +145,38 @@ public class Fuzzer {
 		while (true) {
 			initializeGoldenGrammar();
 			String text = "12 + a2";
-			try {
-				LazyExtractor le = new LazyExtractor(getGolden_grammar_EP(), text, null);
-				ParseTree p = le.extract_a_tree();
-				System.out.printf("Finished");
-			} catch (ParseException e1) {
-				e1.printStackTrace();
+			List<Object> my_lst = new ArrayList<Object>();
+			ChoiceNode choices = new ChoiceNode(null, 1, 0);
+			int counter = 1;
+			LazyExtractor le = null;
+			while(true) {
+				try {
+					if(le == null) {
+						le = new LazyExtractor(getGolden_grammar_EP(), text, choices, 1);
+					} else {
+						le = new LazyExtractor(getGolden_grammar_EP(), text, choices, le.global_counter);
+					}
+					List<Object> lst = le.extract_a_tree(counter);
+					ParseTree pt = (ParseTree) lst.get(0);
+					ChoiceNode last_choice = (ChoiceNode) lst.get(1);
+					counter = (int) lst.get(2);
+					if(last_choice == null) {
+						break;
+					}
+					// System.out.printf("Tree: %s\n", pt.tree_to_string());
+					String s = pt.getTerminals();
+					List<Object> obj = pt.tree_to_string_any(pt);
+					my_lst.add(obj);
+					assert s == text;
+					ChoiceNode v = last_choice.increment();
+					if(v == null) {
+						break;
+					}
+				} catch (ParseException e1) {
+					e1.printStackTrace();
+				}
 			}
+			System.out.printf("Len my_lst: %d\nContent my_lst: %s\n", my_lst.size(), my_lst.toString());
 			System.exit(0);
 			createRandomTrees(10);
 			String created_string = generate(log_level); // Generate a new valid JSON Object, according to org.json.JSONObject

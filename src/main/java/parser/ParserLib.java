@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
+import java.util.function.Consumer;
 
 import javax.swing.plaf.basic.BasicInternalFrameTitlePane.MaximizeAction;
 
@@ -164,7 +165,7 @@ class G {
 }
 // Parser.py
 
-class ParseTree implements Iterator<ParseTree>{
+class ParseTree{
     String name;
     ArrayList<ParseTree> children;
     private boolean indented_nt = false; // TODO change - howto?
@@ -205,21 +206,34 @@ class ParseTree implements Iterator<ParseTree>{
     	}
     	return s;
     }
-    
-    
-    
-    @Override
-	public boolean hasNext() {
-		// TODO Auto-generated method stub
-		return false;
-	}
+    // Credits: https://stackoverflow.com/questions/5849154/can-we-write-our-own-iterator-in-java
+    public Iterator<ParseTree> iterator() {
+        Iterator<ParseTree> it = new Iterator<ParseTree>() {
+
+            private int currentIndex = 0;
+
+        	@Override
+        	public boolean hasNext() {
+        		return children.size() > currentIndex && children.get(currentIndex) != null;
+        	}
+
+        	@Override
+        	public ParseTree next() {
+        		return(children.get(currentIndex++));}
+
+            @Override
+            public void remove() {
+                throw new UnsupportedOperationException();
+            }
+        };
+        return it;
+    }
 
 	@Override
-	public ParseTree next() {
-		// TODO Auto-generated method stub
-		return null;
+	public String toString() {
+		return String.format("Terminals represented by this tree: %s\nTree:\n%s\n", this.getTerminals(), this.tree_to_string());
 	}
-
+	
 	public String tree_to_string_line() {
     	return "(" + this._tree_to_string_line("") + ")";
     }
@@ -368,7 +382,8 @@ class ParseTree implements Iterator<ParseTree>{
     	return result;
     }
     private String _tree_to_string(int indent, String tree) {
-    	tree += "   ".repeat(indent) + this.name;
+    	String s = this.name.equals(" ") ? "' '" : "'" + this.name + "'";
+    	tree += "\t".repeat(indent) + s;
         for (ParseTree p : this.children) {
             tree = p._tree_to_string(indent + 1, tree + "\n");
         }
@@ -670,11 +685,42 @@ class ParseTree implements Iterator<ParseTree>{
 		}
 		return s;
 	}
+
 	public ParseTree prune_tree_helper(ParseTree pt_copy, EarleyParser ep) {
-		for(ParseTree p : this.children) {
-			pt_copy.children.add(ep.prune_tree(p));
+		for(ParseTree p : pt_copy.children) {
+			ArrayList<ParseTree> tmp = new ArrayList<ParseTree>();
+			tmp.add(ep.prune_tree(p));
+			System.out.printf("Added:\n%s\nto the list of childrens:\n%s\n", tmp.get(tmp.size()-1), tmp.toString());
+			this.children = tmp;
 		}
-		return pt_copy;
+		return this;
+	}
+	
+	public List<Object> tree_to_string_any(ParseTree pt) {
+		if(pt.name.contains("any")) {
+			String s = pt.tree_to_string_prune();
+			List<Object> obj = new ArrayList<Object>();
+			obj.add(0, s.length());
+			obj.add(1, String.format("<any %s>", s));
+			return obj;
+		}
+		if(pt.name.startsWith("<") && pt.name.endsWith(">")) {
+			List<Object> obj = new ArrayList<Object>();
+			obj.add(0, 0);
+			obj.add(1, pt.name);
+			return obj;
+		} else {
+			List<Object> gs = tree_to_string_any_helper(pt);
+			return gs;
+			
+		}
+	}
+	private List<Object> tree_to_string_any_helper(ParseTree pt) {
+		List<Object> lst = new ArrayList<Object>();
+		for(ParseTree p : pt.children) {
+			lst = tree_to_string_any(p);
+		}
+		return lst;
 	}
 	
 }
@@ -1208,13 +1254,15 @@ class EarleyParser extends Parser {
 	public ParseTree prune_tree(ParseTree pt) {
 		String name = pt.name;
 		ArrayList<ParseTree> children = pt.children;
-		System.out.printf("Parsetree: %s\n", pt.tree_to_string_line());
+		System.out.printf("Parsetree:\n%s\n", pt.tree_to_string_line());
 		if(name == "<>") {
-			assert children.size() == 1;
+			assert pt.children.size() == 1;
+			System.out.printf("return children0:\n%s\n", children.get(0).tree_to_string_line());
 			return this.prune_tree(pt.children.get(0));
 		}
 		if(this.coalesce_tokens) {
-			children = this.coalesce(children);
+			pt.children = this.coalesce(pt.children);
+			System.out.printf("children:\n%s\n", pt.children.toString());
 		}
 		if(this.tokens.contains(pt.name)) {
 			StringBuilder sb = new StringBuilder(pt.tree_to_string_prune());
@@ -1222,12 +1270,17 @@ class EarleyParser extends Parser {
 			for(int x = 0; x < sb.length(); x++) {
 				new_child.add(new ParseTree(Character.toString(sb.charAt(x)), new ArrayList<ParseTree>()));
 			}
-			return (new ParseTree(name, new_child));
-		} else {
-			ParseTree copy = new ParseTree(pt);
-			pt.prune_tree_helper(copy, this);
-			pt = copy;
+			System.out.printf("set new Parsetree childs:\n%s\n", new_child.toString());
+			pt.children = new_child;
 			return pt;
+		} else {
+			// System.out.printf("copy tree after:\n%s\npt tree after:\n%s\n", copy.toString(), pt.toString());
+			ParseTree copy = new ParseTree(pt);
+			return pt.prune_tree_helper(copy, this);
+//			System.out.printf("Vor Tree: %s\n", pt.tree_to_string());
+			// pt = copy;
+			// System.out.printf("Nach Tree: %s\n", pt.tree_to_string());
+			// return pt;
 		}
 	}
 	
@@ -1253,174 +1306,6 @@ class EarleyParser extends Parser {
 		return new_lst;
 	}
 }
-
-/*
-class LeoParser(EarleyParser):
-    def complete(self, col, state):
-        return self.leo_complete(col, state)
-
-    def leo_complete(self, col, state):
-        detred = self.deterministic_reduction(state)
-        if detred:
-            col.add(detred.copy())
-        else:
-            self.earley_complete(col, state)
-
-    def deterministic_reduction(self, state):
-        raise NotImplemented()
-
-    def uniq_postdot(self, st_A):
-        col_s1 = st_A.s_col
-        parent_states = [
-            s for s in col_s1.states if s.expr and s.at_dot() == st_A.name
-        ]
-        if len(parent_states) > 1:
-            return None
-        matching_st_B = [s for s in parent_states if s.dot == len(s.expr) - 1]
-        return matching_st_B[0] if matching_st_B else None
-
-    def get_top(self, state_A):
-        st_B_inc = self.uniq_postdot(state_A)
-        if not st_B_inc:
-            return None
-
-        t_name = st_B_inc.name
-        if t_name in st_B_inc.e_col.transitives:
-            return st_B_inc.e_col.transitives[t_name]
-
-        st_B = st_B_inc.advance()
-
-        top = self.get_top(st_B) or st_B
-        return st_B_inc.e_col.add_transitive(t_name, top)
-
-    def deterministic_reduction(self, state):
-        return self.get_top(state)
-
-    def __init__(self, grammar, **kwargs):
-        super().__init__(grammar, **kwargs)
-        self._postdots = {}
-
-    def uniq_postdot(self, st_A):
-        col_s1 = st_A.s_col
-        parent_states = [
-            s for s in col_s1.states if s.expr and s.at_dot() == st_A.name
-        ]
-        if len(parent_states) > 1:
-            return None
-        matching_st_B = [s for s in parent_states if s.dot == len(s.expr) - 1]
-        if matching_st_B:
-            self._postdots[matching_st_B[0]._t()] = st_A
-            return matching_st_B[0]
-        return None
-
-    def expand_tstate(self, state, e):
-        if state._t() not in self._postdots:
-            return
-        c_C = self._postdots[state._t()]
-        e.add(c_C.advance())
-        self.expand_tstate(c_C.back(), e)
-
-    def rearrange(self, table):
-        f_table = [Column(c.index, c.letter) for c in table]
-        for col in table:
-            for s in col.states:
-                f_table[s.s_col.index].states.append(s)
-        return f_table
-
-    def parse(self, text, start_symbol):
-        cursor, states = self.parse_prefix(text, start_symbol)
-        start = next((s for s in states if s.finished()), None)
-        if cursor < len(text) or not start:
-            raise SyntaxError("at " + repr(text[cursor:]))
-
-        self.r_table = self.rearrange(self.table)
-        forest = self.extract_trees(self.parse_forest(self.table, start))
-        for tree in forest:
-            yield tree
-
-    def parse_forest(self, chart, state):
-        if isinstance(state, TState):
-            self.expand_tstate(state.back(), state.e_col)
-
-        return super().parse_forest(chart, state)
-*/
-
-/*
-class IterativeEarleyParser(LeoParser):
-    def parse_paths(self, named_expr_, chart, frm, til_):
-        return_paths = []
-        path_build_stack = [(named_expr_, til_, [])]
-
-        def iter_paths(path_prefix, path, start, k, e):
-            x = path_prefix + [(path, k)]
-            if not e:
-                return_paths.extend([x] if start == frm else [])
-            else:
-                path_build_stack.append((e, start, x))
-
-        while path_build_stack:
-            named_expr, til, path_prefix = path_build_stack.pop()
-            *expr, var = named_expr
-
-            starts = None
-            if var not in self.grammar:
-                starts = ([(var, til - len(var),
-                        't')] if til > 0 and chart[til].letter == var else [])
-            else:
-                starts = [(s, s.s_col.index, 'n') for s in chart[til].states
-                      if s.finished() and s.name == var]
-
-            for s, start, k in starts:
-                iter_paths(path_prefix, s, start, k, expr)
-
-        return return_paths
-
-    def choose_a_node_to_explore(self, node_paths, level_count):
-        first, *rest = node_paths
-        return first
-
-    def extract_a_tree(self, forest_node_):
-        start_node = (forest_node_[0], [])
-        tree_build_stack = [(forest_node_, start_node[-1], 0)]
-
-        while tree_build_stack:
-            forest_node, tree, level_count = tree_build_stack.pop()
-            name, paths = forest_node
-
-            if not paths:
-                tree.append((name, []))
-            else:
-                new_tree = []
-                current_node = self.choose_a_node_to_explore(paths, level_count)
-                for p in reversed(current_node):
-                    new_forest_node = self.forest(*p)
-                    tree_build_stack.append((new_forest_node, new_tree, level_count + 1))
-                tree.append((name, new_tree))
-
-        return start_node
-
-    def extract_trees(self, forest):
-        yield self.extract_a_tree(forest)
-*/
-/*
-    test_cases = [
-        (A1_GRAMMAR, '1-2-3+4-5'),
-        # (A2_GRAMMAR, '1+2'),
-        # (A3_GRAMMAR, '1+2+3-6=6-1-2-3'),
-        # (LR_GRAMMAR, 'aaaaa'),
-        # (RR_GRAMMAR, 'aa'),
-        # (DIRECTLY_SELF_REFERRING, 'select a from a'),
-        # (INDIRECTLY_SELF_REFERRING, 'select a from a'),
-        # (RECURSION_GRAMMAR, 'AA'),
-        # (RECURSION_GRAMMAR, 'AAaaaa'),
-        # (RECURSION_GRAMMAR, 'BBccbb')
-    ]
-
-    for i, (grammar, text) in enumerate(test_cases):
-        print(i, text)
-        tree, *_ =  IterativeEarleyParser(grammar, canonical=True).parse(text)
-        assert text == tree_to_string(tree)
-*/
 
 public class ParserLib {
     Grammar grammar;
@@ -1506,20 +1391,20 @@ class ChoiceNode {
 	}
 
 	public ChoiceNode increment() {
-		next = null;
-		if(parent == null) {
+		this.next = null;
+		if(this.parent == null) {
 			return null;
 		}
-		setChosen(getChosen() + 1);
+		this.setChosen(getChosen() + 1);
 		if(this.finished()) {
-			return parent.increment();
+			return this.parent.increment();
 		}
 		return this;
 	}
 
 	public boolean finished() {
 		// TODO Auto-generated method stub
-		return getChosen() >= getTotal();
+		return this.getChosen() >= this.getTotal();
 	}
 
 	public int getCounter() {
@@ -1574,11 +1459,11 @@ class LazyExtractor{
 	int global_counter = 0;
 	
 	
-	public LazyExtractor(EarleyParser parser, String text, ChoiceNode choices) throws ParseException {
+	public LazyExtractor(EarleyParser parser, String text, ChoiceNode choices, int global_counter) throws ParseException {
 		this.parser = parser;
 		this.text = text;
 		this.choices = choices;
-		
+		this.global_counter = global_counter;
 		
 		ParseForest forest = parser.parse_prefix(text, "<start>");
 	    State start = null;
@@ -1594,16 +1479,25 @@ class LazyExtractor{
 	    this.my_forest = parser.parse_forest(parser.table, start);
 	}
 	
-	public ParseTree extract_a_tree() {
-		choices = new ChoiceNode(null, 1, 0);
+	public List<Object> extract_a_tree(int counter) {
+		List<Object> obj = new ArrayList<Object>();
+		// choices = new ChoiceNode(null, 1, 0);
+		LEReturnTriple ler = null;
 		while(!this.choices.finished()) {
 			HashSet<LETriple> seen = new HashSet<LETriple>();
-			LEReturnTriple ler = extract_a_node(this.my_forest, seen, this.choices, null);
-			choices = ler.getChoicenode();
+			ler = extract_a_node(this.my_forest, seen, this.choices, null);
+			if(ler.getParsetree() != null) {
+				System.out.printf("Tree[%d]:\n%s\n", counter++, ler.getParsetree().tree_to_string());
+			}
+			// ChoiceNode c = ler.getChoicenode();
 			if(ler.getPostree() != null) {
-				return this.parser.prune_tree(ler.getParsetree());
+				obj.add(0, ler.getParsetree());
+				obj.add(1, ler.getChoicenode());
+				obj.add(2, counter);
+				return obj;
 			} else {
-				ler.getChoicenode().increment();
+				 ler.getChoicenode().increment();
+				 // System.out.printf("%s\n", c);
 			}
 			
 		}
@@ -1614,7 +1508,7 @@ class LazyExtractor{
 		if(new_seen_element != null) {
 			seen.add(new_seen_element);
 		}
-		System.out.printf("\n----------\nseen: %s\nchoices: %s\n", seen.toString(), choices.toString());
+//		System.out.printf("\n----------\nseen: %s\nchoices: %s\n", seen.toString(), choices.toString());
 		String name = forest_node.name;
 		ArrayList<ArrayList<TPath>> paths = forest_node.paths;
 		if(paths.size() == 0) {
@@ -1627,7 +1521,8 @@ class LazyExtractor{
 		int i;
 		int l;
 		while(true) {
-			ChoiceNode new_choices = choose_path(paths, choices);
+			ChoiceNode new_choices = this.choose_path(paths, choices);
+			System.out.printf("choose_path; global counter: %d: %s\n", this.global_counter, new_choices);
 			i = this.choose_path_i;
 			l = this.choose_path_l;
 			ArrayList<TPath> curr_path = paths.get(i);
@@ -1647,15 +1542,20 @@ class LazyExtractor{
 				} else {
 					nid = new LETriple(s.name, s.s_col.index, s.e_col.index);
 				}
+				// System.out.printf("nid (%d): %s\n", nid.hashCode(), nid.toString());
+//				for(LETriple x : seen) {
+//					System.out.printf("Elem (%d): %s\nnid equals elem: %s\n", x.hashCode(), x.toString(), nid.equals(x));
+//				}
+//				System.out.print("");
 				if(seen.contains(nid)) {
 					LEReturnTriple ler = new LEReturnTriple(null, null, new_choices);
 					return ler;
 				}
 				NamedForest f = this.parser.forest(s, kind, chart);
-				System.out.printf("seen: %s\nnid: %s\n", seen, nid);
+//				System.out.printf("seen: %s\nnid: %s\n", seen, nid);
 				@SuppressWarnings("unchecked")
 				LEReturnTriple result = extract_a_node(f, (HashSet<LETriple>) seen.clone(), new_choices, nid);
-				System.out.printf("%s", result);
+//				System.out.printf("%s", result);
 				ChoiceNode newer_choices = result.getChoicenode();
 				if(result.getPostree() == null) {
 					LEReturnTriple ler = new LEReturnTriple(null, null, newer_choices);
@@ -1681,19 +1581,20 @@ class LazyExtractor{
 	
 	private ChoiceNode choose_path(ArrayList<ArrayList<TPath>> paths, ChoiceNode choices) {
 		int i = 0;
+		this.choose_path_l = paths.size();
 		if(choices.getNext() != null) {
 			if(choices.getNext().finished()) {
 				paths = null;
 				return choices.getNext();
 			}
+			i = choices.getNext().chosen();
 			
 		} else {
+			choices.setNext(new ChoiceNode(choices, this.choose_path_l, global_counter));
 			global_counter++;
-			choices.setNext(new ChoiceNode(choices, paths.size(), global_counter));
 			i = choices.getNext().chosen();
 		}
 		this.choose_path_i = i;
-		this.choose_path_l = paths.size();
 		choices = choices.getNext();
 		return choices;
 	}
@@ -1711,8 +1612,19 @@ class LETriple{ // Lazy extractor tuple for set seen
 	
 	@Override
 	public boolean equals(Object obj) {
+		if(this == obj) {
+			return true;
+		}
+		if(!(obj instanceof LETriple)) {
+			return false;
+		}
 		LETriple le = (LETriple) obj;
 		return this.name.equals(le.name) && this.s_col_index == le.s_col_index && this.e_col_index == le.e_col_index;
+	}
+	
+	@Override
+	public int hashCode() {
+		return this.name.hashCode() + this.e_col_index + this.s_col_index;
 	}
 	
 	@Override
@@ -1801,11 +1713,4 @@ class Postree{
 		}
 		return s;
 	}
-}
-
-class LETuple{
-	// postree, consisting of a triple and a 
-	private LETriple let;
-	private ArrayList<LETriple> lst;
-	
 }
