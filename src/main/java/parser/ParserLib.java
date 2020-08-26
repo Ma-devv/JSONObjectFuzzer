@@ -1487,7 +1487,7 @@ class LazyExtractor{
 			HashSet<LETriple> seen = new HashSet<LETriple>();
 			ler = extract_a_node(this.my_forest, seen, this.choices, null);
 			if(ler.getParsetree() != null) {
-				System.out.printf("Tree[%d]:\n%s\n", counter++, ler.getParsetree().tree_to_string());
+//				System.out.printf("Tree[%d]:\n%s\n", counter++, ler.getParsetree().tree_to_string());
 			}
 			// ChoiceNode c = ler.getChoicenode();
 			if(ler.getPostree() != null) {
@@ -1522,7 +1522,7 @@ class LazyExtractor{
 		int l;
 		while(true) {
 			ChoiceNode new_choices = this.choose_path(paths, choices);
-			System.out.printf("choose_path; global counter: %d: %s\n", this.global_counter, new_choices);
+//			System.out.printf("choose_path; global counter: %d: %s\n", this.global_counter, new_choices);
 			i = this.choose_path_i;
 			l = this.choose_path_l;
 			ArrayList<TPath> curr_path = paths.get(i);
