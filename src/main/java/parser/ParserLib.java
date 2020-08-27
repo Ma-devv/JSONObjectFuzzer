@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.function.Consumer;
 
 import javax.swing.plaf.basic.BasicInternalFrameTitlePane.MaximizeAction;
@@ -544,6 +545,7 @@ class ParseTree{
 	 * <anychar> rule in the tree
 	 * 
 	 * */
+	// TODO Reset counters like pos_counter, etc for multiple use
 	public HashMap<Integer, Integer> getMapOfPosStringAnychar() {
 		setAnycharSeen(this, false);
 		setCurrentlySeenAnychar(this, 0);
@@ -632,15 +634,8 @@ class ParseTree{
     	}
     }
 
-//	@Override
-//	public int hashCode() {
-//		// We need to adjust the hashCode() as we need something to compare 
-//		// two objects during HDD (equals not possible due to deep copy)
-//		return this.count_leafes() + this.getTerminals().hashCode();
-//	}
-
     
-    public ParseTree replaceTreeNodeWithPath(ParseTree main_tree, ParseTree replacement, ArrayList<Integer> path, int path_counter) {
+    public ParseTree replaceTreeNodeUsingPath(ParseTree main_tree, ParseTree replacement, ArrayList<Integer> path, int path_counter) {
     	try {
     		if(path.size() == path_counter) {
     			// Replace tree
@@ -649,7 +644,7 @@ class ParseTree{
         	}
         	
     		int pos = path.get(path_counter);
-    		this.children.get(pos).replaceTreeNodeWithPath(main_tree, replacement, path, path_counter + 1);
+    		this.children.get(pos).replaceTreeNodeUsingPath(main_tree, replacement, path, path_counter + 1);
 		} catch (Exception e) {
 			System.out.println("Error replaceTreeNodeWithPath: " + e.toString());
 		}
@@ -721,6 +716,36 @@ class ParseTree{
 			lst = tree_to_string_any(p);
 		}
 		return lst;
+	}
+
+	public void getPathListForSymbols(ArrayList<Integer> path, int depth, HashMap<String, TreeMap<Integer, ArrayList<ArrayList<Integer>>>> lst) {
+		if(lst.get(this.name) != null) { // Is there already a TreeMap within the HashMap?
+			TreeMap<Integer, ArrayList<ArrayList<Integer>>> depth_path_lst_map = lst.get(this.name);
+			if(depth_path_lst_map.get(depth) != null) { // Is there already a path entry for this depth? (needed for the correct sorting)
+				// If this is the case, then we can easily add the current path to the list
+				ArrayList<ArrayList<Integer>> dept_path_lst = depth_path_lst_map.get(depth);
+				// Add the path
+				dept_path_lst.add(path);
+			} else {
+				ArrayList<ArrayList<Integer>> tmp_lst = new ArrayList<ArrayList<Integer>>();
+				tmp_lst.add(path);
+				depth_path_lst_map.put(depth, tmp_lst);
+			}
+		} else {
+			lst.put(this.name, new TreeMap<Integer, ArrayList<ArrayList<Integer>>>());
+			TreeMap<Integer, ArrayList<ArrayList<Integer>>> depth_path_lst_map = lst.get(this.name);
+			ArrayList<ArrayList<Integer>> tmp_lst = new ArrayList<ArrayList<Integer>>();
+			tmp_lst.add(path);
+			depth_path_lst_map.put(depth, tmp_lst);
+		}
+		for(int i = 0; i < this.children.size(); i++) {
+			ArrayList<Integer> tmp_path = new ArrayList<Integer>();
+			tmp_path.addAll(path);
+			tmp_path.add(i);
+			if(this.children.get(i).children.size() > 0 && this.is_nt() && !this.children.get(i).name.contains("any")) {
+				this.children.get(i).getPathListForSymbols(tmp_path, depth + 1, lst);
+			}
+		}
 	}
 	
 }
@@ -1487,6 +1512,7 @@ class LazyExtractor{
 			HashSet<LETriple> seen = new HashSet<LETriple>();
 			ler = extract_a_node(this.my_forest, seen, this.choices, null);
 			if(ler.getParsetree() != null) {
+				counter++;
 //				System.out.printf("Tree[%d]:\n%s\n", counter++, ler.getParsetree().tree_to_string());
 			}
 			// ChoiceNode c = ler.getChoicenode();

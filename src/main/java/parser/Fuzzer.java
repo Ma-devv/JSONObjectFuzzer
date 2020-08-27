@@ -150,11 +150,14 @@ public class Fuzzer {
 		int i = 0;
 		while (true) {
 			initializeGoldenGrammar();
+//			parseStringUsingLazyExtractor("12 + a2", this.golden_grammar_EP);
+//			System.exit(0);
 			createRandomTrees(10);
 			String created_string = generate(log_level); // Generate a new valid JSON Object, according to org.json.JSONObject
 			if(created_string != null) {
 				// Check if the created string is also valid according to the "golden grammar"
 		        try {
+		        	created_string = "[R14^y]";
 		        	System.out.println("\nCreated string [" + (i + 1) + "]: " + created_string);
 	        		for(ParseTree pt : this.getCurr_pl().parse_string(created_string, this.getCurr_ep())) {
 	        			if(pt != null) {
@@ -247,10 +250,18 @@ public class Fuzzer {
     			}
 				for(int elemC = 0; elemC < entry.getValue().get(gRuleC).size(); elemC++) {
 					try {
-						// Try to parse the string using the adjusted golden grammar. If successful, try to get (multiple) ParseTrees
-                		ParseTree best_tree = getBestParseTreeForAdjustedState(state, master, gRuleC, elemC, created_string);
-                		if(best_tree != null) {
-                			ParsedStringSettings pss = createPssForBestTree(best_tree, created_string, state, master, gRuleC, elemC, entry, null);
+						if(state.equals("<sp1>")) {
+							System.out.printf("");
+						}
+						// get(0) = ParseTree
+						// get(1) = list for anychar deletion
+                		List<Object> lst_obj = getBestParseTreeForAdjustedState(state, master, gRuleC, elemC, created_string);
+                		if(lst_obj != null) {
+                			ParseTree best_tree = (ParseTree) lst_obj.get(0);
+                			int length_of_anychar_chars = (int) lst_obj.get(1);
+							@SuppressWarnings("unchecked")
+							TreeMap<Integer, Integer> sorted_pos_length_lst = (TreeMap<Integer, Integer>) lst_obj.get(2);
+                			ParsedStringSettings pss = createPssForBestTree(best_tree, sorted_pos_length_lst, created_string, state, master, gRuleC, elemC, entry, null);
                 			if(pss != null) {
                 	            HDD hdd = new HDD();
                 	            hdd.startHDD(pss, this.getExclude_grammars(), this.getGolden_grammar_PL(), this.getGolden_grammar_EP(), this.log);
@@ -281,9 +292,13 @@ public class Fuzzer {
 				System.out.println("\nAdd <anycharsp> to the set of rules of " + state);
 			}
 			try {
-        		ParseTree best_tree = getBestParseTreeForAdjustedState(state, created_string, anycharsp);
-        		if(best_tree != null) {
-        			ParsedStringSettings pss = createPssForBestTree(best_tree, created_string, state, master, -1, -1, entry, anycharsp);
+        		List<Object> lst_obj = getBestParseTreeForAdjustedState(state, created_string, anycharsp);
+        		if(lst_obj != null) {
+        			ParseTree best_tree = (ParseTree) lst_obj.get(0);
+        			int length_of_anychar_chars = (int) lst_obj.get(1);
+					@SuppressWarnings("unchecked")
+					TreeMap<Integer, Integer> sorted_pos_length_lst = (TreeMap<Integer, Integer>) lst_obj.get(2);
+        			ParsedStringSettings pss = createPssForBestTree(best_tree, sorted_pos_length_lst, created_string, state, master, -1, -1, entry, anycharsp);
         			if(pss != null) {
         	            HDD hdd = new HDD();
         	            hdd.startHDD(pss, this.getExclude_grammars(), this.getGolden_grammar_PL(), this.getGolden_grammar_EP(), true);
@@ -306,34 +321,26 @@ public class Fuzzer {
     	System.exit(0);
 	}
 	
-	private ParsedStringSettings createPssForBestTree(ParseTree pt, String created_string, String state, HashMap<String, GDef> master, int gRuleC, int elemC, Entry<String, GDef> entry, GRule anycharsp) {
+	private ParsedStringSettings createPssForBestTree(ParseTree pt, TreeMap<Integer, Integer> sorted_pos_length_lst, String created_string, String state, HashMap<String, GDef> master, int gRuleC, int elemC, Entry<String, GDef> entry, GRule anycharsp) {
 		System.out.printf("Original string: %s\tLength %d\n", created_string, created_string.length());
 		StringBuilder sb_created_string = new StringBuilder(created_string);
 		int anychars_length;
 		int pos;
 		int removed_chars = 0;
 		StringBuilder removed_chars_from_string = new StringBuilder("");
-		// Initialize for the first iteration in while(){...}
-		HashMap<Integer, Integer> pos_length_lst = pt.getMapOfPosStringAnychar();
-		Map<Integer, Integer> sorted_pos_length_lst = new TreeMap<Integer, Integer>(pos_length_lst);
+//		HashMap<Integer, Integer> pos_length_lst = pt.getMapOfPosStringAnychar();
+//		Map<Integer, Integer> sorted_pos_length_lst = new TreeMap<Integer, Integer>(pos_length_lst);
 		int counter = 0;
 		for(Map.Entry<Integer, Integer> pos_length : sorted_pos_length_lst.entrySet()) {
-//				System.out.println("Key: " + pos_length.getKey() + " Value: " + pos_length.getValue());
 			pos = pos_length.getKey();
 			pos -= removed_chars; // We take the length of characters, that have already been removed into account
 			anychars_length = pos_length.getValue();
-//				if(this.log) {
-//					System.out.printf("Starting position to remove characters from: %d\nLength: %d\n", pos, anychars_length);
-//				}
+
 			for(int i = 0; i < anychars_length; i++) { // Can not use normal delete as there a strange behavior when start = end (then nothing will be deleted))
 				try {
-//						System.out.println("Lenght of the current string: " + sb_created_string.length());
 					removed_chars_from_string.append(sb_created_string.charAt(pos));
-//						System.out.println("Removed char");
 					sb_created_string.deleteCharAt(pos); // Delete the character at position POS anychars_length-times
-//						if(this.log) {
-//							System.out.printf("Removed %s from %s\n", removed_chars_from_string.charAt(counter), sb_created_string);
-//						}
+
 					counter += 1;
 				} catch (Exception e) {
 					System.out.printf("Exception: %s\nPos: %d, Removed chars: %d, anychars_length: %d\nremoved_chars_from_string: %s\nsb_created_string: %s",
@@ -406,36 +413,69 @@ public class Fuzzer {
 			this.getListForEasiestMod().add(pss);
 		}
 	}
-
-	/*
-	 * Checks if the given string can be parsed using the adjusted golden grammar
-	 * Returns true if the string was parsed successfully using the adjusted golden grammar
-	 * Otherwise false
-	 * */
-	private ParseTree checkStringWithAdjustedGrammar(String created_string, ParserLib pl, EarleyParser ep) {
-		try {
-			if(this.log) {
-				System.out.printf("Check if we can parse %s successfully using the adjusted golden grammar\n", created_string);
+	
+	public static List<Object> parseStringUsingLazyExtractor(String created_string, EarleyParser ep, int max_rounds) {
+		List<Object> result_lst = new ArrayList<Object>();
+		ChoiceNode choices = new ChoiceNode(null, 1, 0);
+		int counter = 1;
+		LazyExtractor le = null;
+		while(true) {
+			try {
+				if(le == null) {
+					le = new LazyExtractor(ep, created_string, choices, 1);
+				} else {
+					le = new LazyExtractor(ep, created_string, choices, le.global_counter);
+				}
+				List<Object> lst = le.extract_a_tree(counter);
+				ParseTree pt = (ParseTree) lst.get(0);
+				ChoiceNode last_choice = (ChoiceNode) lst.get(1);
+				counter = (int) lst.get(2);
+				if(last_choice == null) {
+					break;
+				}
+				// System.out.printf("Tree: %s\n", pt.tree_to_string());
+				String s = pt.getTerminals();
+				// List<Object> obj = pt.tree_to_string_any(pt);
+				HashMap<Integer, Integer> anychar_pos = pt.getMapOfPosStringAnychar();
+				Map<Integer, Integer> sorted_pos_length_lst = new TreeMap<Integer, Integer>(anychar_pos); // For the return value;
+				int len_of_anychar_chars = 0;
+				for(Map.Entry<Integer, Integer> key_value : anychar_pos.entrySet()) {
+					len_of_anychar_chars += key_value.getValue();
+				}
+				
+				if(result_lst.size() == 0) { // No elements within the return list
+					result_lst.add(0, pt);
+					result_lst.add(1, len_of_anychar_chars);
+					result_lst.add(2, sorted_pos_length_lst);
+				} else { // Already an element within the list
+					if(len_of_anychar_chars < (int) result_lst.get(1)) { // New ParseTree is better and has less anychar characters
+						result_lst.set(0, pt);
+						result_lst.set(1, len_of_anychar_chars);
+						result_lst.set(2, sorted_pos_length_lst);
+					}
+				}
+				assert s == created_string;
+				ChoiceNode v = last_choice.increment();
+				if(v == null) {
+					break;
+				}
+				if(counter > max_rounds) {
+					break;
+				}
+			} catch (Exception e) {
+				return null;
 			}
-			ParseTree pt = pl.check_string(created_string, ep);
-			if(pt != null) {
-				return pt;
-			}
-		} catch (Exception e) {
-  			if(this.log) {
-				System.out.println("Failed to parse the string using the adjusted grammar");
-			}
-			return null;
 		}
-		return null;
+		return result_lst;
 	}
 	
 	/*
 	 * Checks the adjusted Grammar
-	 * Returns a list of ParseTree's if the string could be parsed successfully
+	 * Returns the best ParseTree (less amounts of characters that
+	 * are being represented using <anychar> blocks)
 	 * Otherwise null
 	 * */
-	private ParseTree getBestParseTreeForAdjustedState(String state, HashMap<String, GDef> master, int gRuleC, int elemC, String created_string) {
+	private List<Object> getBestParseTreeForAdjustedState(String state, HashMap<String, GDef> master, int gRuleC, int elemC, String created_string) {
 		try {
 			ParserLib pl_adjusted = null;
 			EarleyParser ep_adjusted = null;
@@ -446,73 +486,26 @@ public class Fuzzer {
 				System.out.printf("Adjusted %s[%d][%d]: %s => %s\n", 
 						state, gRuleC, elemC, master.get(state).get(gRuleC).get(elemC), pl_adjusted.grammar.get(state).get(gRuleC).get(elemC));
 			}
-//			if(this.log) {
-//				System.out.println("Create EarleyParser with ParserLib grammar");
-//			}
 			ep_adjusted = new EarleyParser(pl_adjusted.grammar);
 			this.setCurr_pl(pl_adjusted);
 			this.setCurr_ep(ep_adjusted);
-			// ParseTree pt = this.getCurr_pl().parse_string(created_string, this.getCurr_ep());
-			// Loop over the returned ArrayList containing ParseTrees that have been created using the adjusted golden grammar
-			// ArrayList<ParseTree> lst = this.getCurr_pl().parse_string(created_string, this.getCurr_ep());
-			ParseTree result = null;
-			int length_result = 0;
-			ChoiceNode choices = new ChoiceNode(null, 1, 0);
-			int counter = 1;
-			LazyExtractor le = null;
-			while(true) {
-				try {
-					if(le == null) {
-						le = new LazyExtractor(this.getCurr_ep(), created_string, choices, 1);
-					} else {
-						le = new LazyExtractor(this.getCurr_ep(), created_string, choices, le.global_counter);
-					}
-					List<Object> lst = le.extract_a_tree(counter);
-					ParseTree pt = (ParseTree) lst.get(0);
-					ChoiceNode last_choice = (ChoiceNode) lst.get(1);
-					counter = (int) lst.get(2);
-					if(last_choice == null) {
-						break;
-					}
-					// System.out.printf("Tree: %s\n", pt.tree_to_string());
-					String s = pt.getTerminals();
-					// List<Object> obj = pt.tree_to_string_any(pt);
-					HashMap<Integer, Integer> anychar_pos = pt.getMapOfPosStringAnychar();
-					int len_of_anychar_chars = 0;
-					for(Map.Entry<Integer, Integer> key_value : anychar_pos.entrySet()) {
-						len_of_anychar_chars += key_value.getValue();
-					}
-					if(result == null) {
-						result = pt;
-						length_result = len_of_anychar_chars;
-					} else {
-						if(len_of_anychar_chars < length_result) {
-							result = pt;
-							length_result = len_of_anychar_chars;
-						}
-					}
-					assert s == created_string;
-					ChoiceNode v = last_choice.increment();
-					if(v == null) {
-						break;
-					}
-				} catch (Exception e) {
-					System.out.printf("Error during getMultipleParseTreesUsingAdjustedGoldenGrammar: %s\n", e.toString());
-					return null;
-				}
-			}
-        	return result;
+			return parseStringUsingLazyExtractor(created_string, this.getCurr_ep(), 2000);
 		} catch (Exception e) {
-  			if(this.log) {
+			if(this.log) {
 				System.out.println("Failed to parse the string using the adjusted grammar; error: " + e.toString());
 			}
 			return null;
 		}
 	
 	}
-	
-	
-	private ParseTree getBestParseTreeForAdjustedState(String state, String created_string, GRule anycharsp) {
+
+	/*
+	 * Checks the adjusted Grammar
+	 * Returns the best ParseTree (less amounts of characters that
+	 * are being represented using <anychar> blocks)
+	 * Otherwise null
+	 * */
+	private List<Object> getBestParseTreeForAdjustedState(String state, String created_string, GRule anycharsp) {
 		try {
 			// Load the original master grammar
         	ParserLib pl_adjusted = null;
@@ -528,53 +521,7 @@ public class Fuzzer {
 			ep_adjusted = new EarleyParser(pl_adjusted.grammar);
 			this.setCurr_pl(pl_adjusted);
     		this.setCurr_ep(ep_adjusted);
-			ParseTree result = null;
-			int length_result = 0;
-			ChoiceNode choices = new ChoiceNode(null, 1, 0);
-			int counter = 1;
-			LazyExtractor le = null;
-			while(true) {
-				try {
-					if(le == null) {
-						le = new LazyExtractor(this.getCurr_ep(), created_string, choices, 1);
-					} else {
-						le = new LazyExtractor(this.getCurr_ep(), created_string, choices, le.global_counter);
-					}
-					List<Object> lst = le.extract_a_tree(counter);
-					ParseTree pt = (ParseTree) lst.get(0);
-					ChoiceNode last_choice = (ChoiceNode) lst.get(1);
-					counter = (int) lst.get(2);
-					if(last_choice == null) {
-						break;
-					}
-					// System.out.printf("Tree: %s\n", pt.tree_to_string());
-					String s = pt.getTerminals();
-					// List<Object> obj = pt.tree_to_string_any(pt);
-					HashMap<Integer, Integer> anychar_pos = pt.getMapOfPosStringAnychar();
-					int len_of_anychar_chars = 0;
-					for(Map.Entry<Integer, Integer> key_value : anychar_pos.entrySet()) {
-						len_of_anychar_chars += key_value.getValue();
-					}
-					if(result == null) {
-						result = pt;
-						length_result = len_of_anychar_chars;
-					} else {
-						if(len_of_anychar_chars < length_result) {
-							result = pt;
-							length_result = len_of_anychar_chars;
-						}
-					}
-					assert s == created_string;
-					ChoiceNode v = last_choice.increment();
-					if(v == null) {
-						break;
-					}
-				} catch (Exception e) {
-					System.out.printf("Error during getMultipleParseTreesUsingAdjustedGoldenGrammar: %s\n", e.toString());
-					return null;
-				}
-			}
-        	return result;
+			return parseStringUsingLazyExtractor(created_string, this.getCurr_ep(), 2000);
 		} catch (Exception e) {
   			if(this.log) {
 				System.out.println("Failed to parse the string using the adjusted grammar; error: " + e.toString());

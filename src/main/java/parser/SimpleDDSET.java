@@ -57,7 +57,7 @@ public class SimpleDDSET {
 					main_tree.tree_to_string(),
 					biggest_node.tree_to_string(),
 					rand_tree.tree_to_string());
-			main_tree_copy.replaceTreeNodeWithPath(main_tree_copy, rand_tree, path, 0);
+			main_tree_copy.replaceTreeNodeUsingPath(main_tree_copy, rand_tree, path, 0);
 			
 			System.out.println("Copied main tree after biggest node replacements:\n" + p.tree_to_string());
 			if(!parsedByJSON(p.getTerminals())) { // If the change of the tree does not hold once
