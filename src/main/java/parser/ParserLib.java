@@ -547,8 +547,7 @@ class ParseTree{
 	 * */
 	// TODO Reset counters like pos_counter, etc for multiple use
 	public HashMap<Integer, Integer> getMapOfPosStringAnychar() {
-		setAnycharSeen(this, false);
-		setCurrentlySeenAnychar(this, 0);
+		setUpFunction();
 //		System.out.println(this.tree_to_string());
 		HashMap<Integer, Integer> result = new HashMap<Integer, Integer>();
 		int amount_of_seen_anychar = 0;
@@ -572,7 +571,38 @@ class ParseTree{
 		return result;
 	}
 	
-    private void setCurrentlySeenAnychar(ParseTree parseTree, int i) {
+    private void setPosCounter(ParseTree parseTree, int i) {
+    	parseTree.pos_counter = i;
+		for(ParseTree pt : parseTree.children) {
+			setPosCounter(pt, i);
+		}
+		
+	}
+
+	private void setReturnBreak(ParseTree parseTree, boolean b) {
+		parseTree.return_break = b;
+		for(ParseTree pt : parseTree.children) {
+			setReturnBreak(pt, b);
+		}
+		
+	}
+
+	private void setCurrentlySeenAnychars(ParseTree parseTree, int i) {
+		parseTree.currently_seen_anychars = i;
+		for(ParseTree pt : parseTree.children) {
+			setCurrentlySeenAnychar(pt, i);
+		}
+		
+	}
+
+	private void setUpFunction() {
+		setAnycharSeen(this, false);
+		setCurrentlySeenAnychar(this, 0);
+		setCurrentlySeenAnychars(this, 0);
+		setReturnBreak(this, false);
+		setPosCounter(this, 0);
+	}
+	private void setCurrentlySeenAnychar(ParseTree parseTree, int i) {
 		parseTree.currently_seen_anychars = i;
 		for(ParseTree pt : parseTree.children) {
 			setCurrentlySeenAnychar(pt, i);
@@ -635,21 +665,20 @@ class ParseTree{
     }
 
     
-    public ParseTree replaceTreeNodeUsingPath(ParseTree main_tree, ParseTree replacement, ArrayList<Integer> path, int path_counter) {
+    public void replaceTreeNodeUsingPath(ParseTree replacement, ArrayList<Integer> path, int path_counter) {
     	try {
     		if(path.size() == path_counter) {
     			// Replace tree
+//    			System.out.printf("Replace tree:\n%s\nwith tree:\n%s\n", this, replacement);
     			this.children = replacement.children;
-        		return main_tree;
         	}
-        	
-    		int pos = path.get(path_counter);
-    		this.children.get(pos).replaceTreeNodeUsingPath(main_tree, replacement, path, path_counter + 1);
+    		else if(path.size() > path_counter) {
+    			int pos = path.get(path_counter);
+        		this.children.get(pos).replaceTreeNodeUsingPath(replacement, path, path_counter + 1);
+        	}
 		} catch (Exception e) {
-			System.out.println("Error replaceTreeNodeWithPath: " + e.toString());
+			System.out.println("Error replaceTreeNodeUsingPath: " + e.toString());
 		}
-    	
-    	return null;
     }
     
     public ParseTree getParseTreeForPath(ArrayList<Integer> path, int path_counter) {
@@ -746,6 +775,45 @@ class ParseTree{
 				this.children.get(i).getPathListForSymbols(tmp_path, depth + 1, lst);
 			}
 		}
+	}
+
+	public boolean pathReachable(ArrayList<Integer> curr_path, ArrayList<Integer> looped_path, int path_counter) {
+		try {
+			if(curr_path.get(path_counter) != looped_path.get(path_counter)) {
+				return false;
+			}
+			if(curr_path.size() - 1 == path_counter) {
+				if(this.children.size() > 0) { // Check if the subtree is a real children of the original tree
+					return true;
+				} else {
+					return false;
+				}
+			}
+			return this.children.get(curr_path.get(path_counter)).pathReachable(curr_path, looped_path, path_counter + 1);
+		} catch (Exception e) {
+			System.out.printf("pathReachable: %s\n", e.toString());
+		}
+		return false;
+	}
+
+	// Try to get the path for a specified subtree
+	public ArrayList<Integer> getPathForNewMergedTree(ParseTree subtree, ArrayList<Integer> path) {
+		if(this.children == subtree.children) {
+			return path;
+		}
+		int i = 0;
+		ArrayList<Integer> returned_path = null;
+		for(ParseTree pt : this.children) {
+			ArrayList<Integer> tmp_lst = new ArrayList<Integer>();
+			tmp_lst.addAll(path);
+			tmp_lst.add(i++);
+			returned_path = pt.getPathForNewMergedTree(subtree, tmp_lst);
+			if(returned_path != null) {
+				return returned_path;
+			}
+		}
+		return returned_path;
+		
 	}
 	
 }

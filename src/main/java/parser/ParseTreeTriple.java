@@ -1,14 +1,30 @@
 package parser;
 
-public class ParseTreeTuple {
+import java.util.ArrayList;
+import java.util.HashMap;
+
+public class ParseTreeTriple {
 	// Credits to https://stackoverflow.com/questions/521171/a-java-collection-of-value-pairs-tuples
 	private int tree_size;
 	private ParseTree pt;
+	private HashMap<Integer, ArrayList<Integer>> tree_path_with_depth;
 	
-	public ParseTreeTuple(int tree_size, ParseTree pt) {
+	public ParseTreeTriple(int tree_size, ParseTree pt, HashMap<Integer, ArrayList<Integer>> tree_path_with_depth) {
 		this.tree_size = tree_size;
 		this.pt = pt;
+		this.tree_path_with_depth = tree_path_with_depth;
 	}
+
+
+	public HashMap<Integer, ArrayList<Integer>> getTree_path_with_depth() {
+		return tree_path_with_depth;
+	}
+
+
+	public void setTree_path_with_depth(HashMap<Integer, ArrayList<Integer>> tree_path_with_depth) {
+		this.tree_path_with_depth = tree_path_with_depth;
+	}
+
 
 	public int getTree_size() {
 		return tree_size;
@@ -33,10 +49,10 @@ public class ParseTreeTuple {
 
 	@Override
 	public boolean equals(Object obj) {
-		if (!(obj instanceof ParseTreeTuple)) {
+		if (!(obj instanceof ParseTreeTriple)) {
 			return false;
 		}
-		ParseTreeTuple ptt = (ParseTreeTuple) obj;
+		ParseTreeTriple ptt = (ParseTreeTriple) obj;
 		return (this.getPt().equals(ptt.getPt()) && this.getTree_size() == ptt.getTree_size());
 	}
 	

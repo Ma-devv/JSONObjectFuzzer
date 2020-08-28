@@ -6,6 +6,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
+import java.util.Set;
 import java.util.TreeMap;
 
 import org.json.JSONArray;
@@ -17,37 +18,18 @@ public class HDD {
 	 * */
 	private ParserLib golden_grammar_PL;
 	private EarleyParser golden_grammar_EP;
-	public ArrayList<ParseTreeTuple> subtrees_with_symbol(ParseTree tree, String symbol, ArrayList<ParseTreeTuple> result, int depth) {
-		if(result == null) {
-			result = new ArrayList<ParseTreeTuple>();
-		}
-		if(tree.name.equals(symbol)) {
-			ParseTreeTuple ptt = new ParseTreeTuple(depth, tree);
-			result.add(ptt);
-			/*
-			if(tree.children.size() > 0) { // As we are not interested in single non terminals without any childs
-				ParseTreeTuple ptt = new ParseTreeTuple(depth, tree);
-				result.add(ptt);
-			}
-			else {
-				if(this.log) {
-					System.out.println("Skipped empty ParseTree");
-				}
-			}
-			*/
-		}
-		for(ParseTree c : tree.children) {
-			subtrees_with_symbol(c, symbol, result, depth+1);
-		}
-		return result;
-	}
+
 	public String perses_delta_debug(ParseTree tree, Grammar grammar, ParsedStringSettings pss, ParsedStringSettings original_pss, HashSet<String> excludeSet, boolean log) {
 		String result = tree.getTerminals();
 		ParseTree pt = new ParseTree(tree.name, tree.children); // create new ParseTree object (deep copy)
 		// ParseTreeTupleComparator pttComp = new ParseTreeTupleComparator();
-		PriorityQueue<ParseTreeTuple> pq = new PriorityQueue<ParseTreeTuple>(new ParseTreeTupleComparator());
-		pq.add(new ParseTreeTuple(pt.count_leafes(), pt)); // Add the "root" tree to the key to get started
-		
+		PriorityQueue<ParseTreeTriple> pq = new PriorityQueue<ParseTreeTriple>(new ParseTreeTripleComparator());
+		HashMap<Integer, ArrayList<Integer>> init_hmap = new HashMap<Integer, ArrayList<Integer>>();
+		int curr_depth = 0;
+		init_hmap.put(curr_depth, new ArrayList<Integer>());
+		pq.add(new ParseTreeTriple(pt.count_leafes(), pt, init_hmap)); // Add the "root" tree to the key to get started
+		ArrayList<Integer> curr_path = new ArrayList<Integer>();
+		ArrayList<Integer> new_path = new ArrayList<Integer>(); // To override curr_path when reprocess = true;
 		// TODO Need to be updated at some point when the merging was successful
 		// Initialize paths for symbols
 		// String = symobl; name of the ParseTree
@@ -59,44 +41,72 @@ public class HDD {
 		while(!pq.isEmpty()) { // While there are trees in the queue
 			try {
 				ParseTree reprocess = null;
-				ParseTree biggest_node = pq.poll().getPt(); // Get the "biggest" node
+				ParseTreeTriple ptt = pq.poll();
+				ParseTree biggest_node = ptt.getPt(); // Get the "biggest" node
+				Map.Entry<Integer, ArrayList<Integer>> k_v_depth_path = ptt.getTree_path_with_depth().entrySet().iterator().next();
+				curr_depth = k_v_depth_path.getKey();
+				curr_path = k_v_depth_path.getValue();
 				if(log) {
-					System.out.println("\nBiggest node:\n" + biggest_node.tree_to_string());
+					System.out.printf("Current path: %s of the main tree:\n%s\n", curr_path, biggest_node.tree_to_string());
 				}
 				String bsymbol = biggest_node.name; // Get the "biggest" symbol
 				// We need the biggest symbol to find subtrees with the same name/token
 				
+				if(path_to_symbols.get(bsymbol) == null) { // Are there subtrees for the matching tree symbol/name?
+					continue;
+				}
+				Outer_loop:
 				for(Map.Entry<Integer, ArrayList<ArrayList<Integer>>> depth_path_list_mapping : path_to_symbols.get(bsymbol).entrySet()) {
-					for(ArrayList<Integer> path : depth_path_list_mapping.getValue()) { // For each path
-						ParseTree subtree = pss.getTree().getParseTreeForPath(path, 0);
+					// Also important: verify that the depth of the looped path is bigger than the one of the current path
+					// Otherwise we would replace a subtree with a top-subtree
+					int looped_depth = depth_path_list_mapping.getKey();
+					if(looped_depth <= curr_depth) {
+						continue;
+					}
+					for(ArrayList<Integer> looped_path : depth_path_list_mapping.getValue()) { // For each path
+						// Check if the path is reachable and if the subtree is a real children of the tree
+						if(!pss.getTree().pathReachable(curr_path, looped_path, 0)) {
+							if(log) {
+								System.out.printf("Path either not reachable or the subtree is not a real children\n");
+							}
+							continue;
+						}
+						System.out.printf("Looped path: %s\n", looped_path.toString());
+						// Check if current and received path/tree are the same
+						ParseTree subtree = pss.getTree().getParseTreeForPath(looped_path, 0);
 						// Create a copy of the pss so that we are also able to undo the changes
 						ParsedStringSettings saved_pss = new ParsedStringSettings(pss);
 						ParseTree saved_biggest_node = new ParseTree(biggest_node);
 //						System.out.println("Saved biggest pss:\n" + saved_pss.getTree().tree_to_string());
 						System.out.printf("Tree that should replace the biggest node:\n%s\n", subtree.tree_to_string());
 						// pss.getTree().replaceTreeNode(biggest_node, stree.getPt(), log);
-						pss.getTree().replaceTreeNodeUsingPath(biggest_node, subtree, new ArrayList<Integer>(), 0);
+						pss.getTree().replaceTreeNodeUsingPath(subtree, curr_path, 0);
 						System.out.println("Saved biggest pss:\n" + saved_pss.getTree().tree_to_string());
 						System.out.println("New Tree representing the string " + pss.getTree().getTerminals() + ":\n" + pss.getTree().tree_to_string());
 						// Check if the subtree has at least one terminal character outside of <anychars> block and is not empty or equals a space character
-						if(checkIfAtLeastOneNonAnychar(pss.getTree(), excludeSet, log) && (!(pss.getTree().getTerminals().equals("") || pss.getTree().getTerminals().equals(" ")))) {
+						if(checkIfAtLeastOneNonAnychar(pss.getTree(), excludeSet, log) && 
+								(!(pss.getTree().getTerminals().equals("") || 
+								pss.getTree().getTerminals().equals(" "))) &&
+								pss.getTree().getTerminals().length() <= saved_pss.getTree().getTerminals().length()) {
 							if(checkJSON(pss, log)) {
 								// Results in us having a new set of characters that we can try to parse using the adjusted grammar
 								// Now we have to check if the modified terminals can be parsed again using the adjusted grammar
 								if(checkIfGGFails(pss.getTree().getTerminals(), log)) {
-									// TODO; RENEW THE LIST
+									new_path = new ArrayList<Integer>();
+									new_path = pss.getTree().getPathForNewMergedTree(subtree, new ArrayList<Integer>());
+									path_to_symbols.clear();
 									pss.getTree().getPathListForSymbols(new ArrayList<Integer>(), 0, path_to_symbols);
-//									System.out.format("Replace the biggest node with:\n%s\n", stree.getPt().tree_to_string());
 									if(log) {
 										System.out.format("Replace the biggest node with:\n%s\n", subtree.tree_to_string());
 									}
-									replaceBiggestNode(biggest_node, subtree, log);
+									biggest_node = subtree; 
 									if(log) {
 										System.out.println("Set new \"Minimized string using HDD\": " + pss.getTree().getTerminals()); // Created string = hdd string; we set the hdd string
 									}
 									reprocess = subtree;
 									result = pss.getTree().getTerminals();
-									break;
+									// TODO BREAK OUTER LOOP
+									break Outer_loop;
 								}
 							}
 						}
@@ -113,15 +123,23 @@ public class HDD {
 				}
 
 				if(reprocess != null) { // Did we found a subtree/sub-input that has been parsed successfully?
-					biggest_node = reprocess;
-					ParseTreeTuple t_ptt = new ParseTreeTuple(biggest_node.count_leafes(), biggest_node);
+					HashMap<Integer, ArrayList<Integer>> tmp_hmap = new HashMap<Integer, ArrayList<Integer>>();
+					// The depth stays the same as we replaced the node of the biggest tree
+					tmp_hmap.put(curr_depth, new_path);
+					ParseTreeTriple t_ptt = new ParseTreeTriple(biggest_node.count_leafes(), biggest_node, tmp_hmap);
 					pq.add(t_ptt);
 				}
 				else {
-					for(ParseTree stree : biggest_node.children) {
+					for(int i = 0; i < biggest_node.children.size(); i++) {
+						ParseTree stree = biggest_node.children.get(i);
 						if(stree.is_nt() && !excludeSet.contains(stree.name)) { // Not interested in terminals and in <anychar> blocks
 							System.out.println("Added Subtree " +stree.name + " to the queue");
-							ParseTreeTuple t_ptt = new ParseTreeTuple(stree.count_leafes(), stree);
+							ArrayList<Integer> tmp_path = new ArrayList<Integer>();
+							tmp_path.addAll(curr_path);
+							tmp_path.add(i);
+							HashMap<Integer, ArrayList<Integer>> tmp_hmap = new HashMap<Integer, ArrayList<Integer>>();
+							tmp_hmap.put(curr_depth + 1, tmp_path);
+							ParseTreeTriple t_ptt = new ParseTreeTriple(stree.count_leafes(), stree, tmp_hmap);
 							pq.add(t_ptt);
 						}
 					}
@@ -137,32 +155,19 @@ public class HDD {
 	
 	private boolean checkJSON(ParsedStringSettings pss, boolean log) {
 		String terminals = pss.getTree().getTerminals();
-		if(pss.getData_type().equals("OBJECT")) {
+		// terminals = "[R14^y]";
+		if(terminals.startsWith("{")) {
 			try {
 				JSONObject obj = new JSONObject(terminals);
-				// If we were able to parse the string successfully, return true
-//				if(log) {
-//					System.out.println("String " + terminals + " successfully parsed using the built in JSON program parser");
-//				}
 				return true;
 			} catch (Exception e) {
-//				if(log) {
-//					System.out.println("Failed to parse " + terminals + "using the built in JSON program parser. Exception: " + e.toString());
-//				}
 				return false;
 			}
 		} else {
 			try {
 				JSONArray obj = new JSONArray(terminals);
-				// If we were able to parse the string successfully, return true
-//				if(log) {
-//					System.out.println("String " + terminals + " successfully parsed using the built in JSON program parser");
-//				}
 				return true;
 			} catch (Exception e) {
-//				if(log) {
-//					System.out.println("Failed to parse " + terminals + "using the built in JSON program parser. Exception: " + e.toString());
-//				}
 				return false;
 			}
 		}
@@ -170,15 +175,9 @@ public class HDD {
 	private boolean checkIfAtLeastOneNonAnychar(ParseTree stree, HashSet<String> excludeSet, boolean log) {
 		for(String s : stree.getParentOfTerminals().split(", ")) {
 			if(!excludeSet.contains(s)) {
-//				if(log) {
-//					System.out.println("Terminals within the tree are represented using at least one non-anychar block.");
-//				}
 				return true;
 			}
 		}
-//		if(log) {
-//			System.out.println("Terminals within the tree are all represented using <anychar>.");
-//		}
 		return false;
 	}
 	
@@ -191,23 +190,10 @@ public class HDD {
 	private Boolean checkIfGGFails(String adjusted_string, boolean log) {
 		try {
 			this.getGolden_grammar_PL().check_string(adjusted_string, this.getGolden_grammar_EP()); // Try to parse the string; return value can be obtained
-//			if(log) {
-//				System.out.println("Golden grammar successfully parsed " + adjusted_string);
-//			}
 			return false;
 		} catch (Exception e) {
-//			if(log) {
-//				System.out.println("Golden grammar failed to parse " + adjusted_string + " successfully");
-//			}
 			return true;
 		}
-	}
-	/*
-	 * Replace the given node "biggest_node" with the subtree "stree" 
-	 * 
-	 * */
-	private void replaceBiggestNode(ParseTree biggest_node, ParseTree stree, Boolean log) {
-		biggest_node = stree;
 	}
 	
 	public ParsedStringSettings startHDD(ParsedStringSettings pss, HashSet<String> excludeSet, ParserLib golden_grammar_PL, EarleyParser golden_grammar_EP, boolean log){		

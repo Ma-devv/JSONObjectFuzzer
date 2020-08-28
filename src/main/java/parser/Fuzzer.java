@@ -78,6 +78,7 @@ public class Fuzzer {
 	 * - adjust hdd so that it will run with the lazyextractor
 	 * - adjust the simpleddset similar to hdd and check the simpleddset
 	 * - check integration of DD
+	 * 		- extend DD such that the correct part of the tree gets removed (needed for simpleDDSET)
 	 * - maybe i should declare a few methods as static 
 	 * */
 	public static void main(String[] args) {
@@ -157,7 +158,7 @@ public class Fuzzer {
 			if(created_string != null) {
 				// Check if the created string is also valid according to the "golden grammar"
 		        try {
-		        	created_string = "[R14^y]";
+		        	created_string = "[599Dti5Mjo4~1x%sZp]";
 		        	System.out.println("\nCreated string [" + (i + 1) + "]: " + created_string);
 	        		for(ParseTree pt : this.getCurr_pl().parse_string(created_string, this.getCurr_ep())) {
 	        			if(pt != null) {
