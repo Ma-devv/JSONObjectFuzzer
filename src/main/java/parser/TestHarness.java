@@ -47,13 +47,8 @@ public abstract class TestHarness<E> {
 	}
 
 
-	public boolean parsedByGG(String input) {
-		try {
-			this.golden_grammar_PL.check_string(input, this.golden_grammar_EP); // Try to parse the string; return value can be obtained
-			return true;
-		} catch (Exception e) {
-			return false;
-		}
+	public boolean parsedByGG(EarleyParser ep, String input_string) {
+		return Fuzzer.checkIfStringCanBeParsedWithGivenGrammar(ep, input_string);
 	}
 
 	/**

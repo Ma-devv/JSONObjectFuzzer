@@ -65,7 +65,7 @@ public class HDD {
 					}
 					for(ArrayList<Integer> looped_path : depth_path_list_mapping.getValue()) { // For each path
 						// Check if the path is reachable and if the subtree is a real children of the tree
-						if(!pss.getTree().pathReachable(curr_path, looped_path, 0)) {
+						if(!pss.getHdd_tree().pathReachable(curr_path, looped_path, 0)) {
 							if(log) {
 								System.out.printf("Path either not reachable or the subtree is not a real children\n");
 							}
@@ -73,38 +73,38 @@ public class HDD {
 						}
 						System.out.printf("Looped path: %s\n", looped_path.toString());
 						// Check if current and received path/tree are the same
-						ParseTree subtree = pss.getTree().getParseTreeForPath(looped_path, 0);
+						ParseTree subtree = pss.getHdd_tree().getParseTreeForPath(looped_path, 0);
 						// Create a copy of the pss so that we are also able to undo the changes
 						ParsedStringSettings saved_pss = new ParsedStringSettings(pss);
 						ParseTree saved_biggest_node = new ParseTree(biggest_node);
 //						System.out.println("Saved biggest pss:\n" + saved_pss.getTree().tree_to_string());
 						System.out.printf("Tree that should replace the biggest node:\n%s\n", subtree.tree_to_string());
 						// pss.getTree().replaceTreeNode(biggest_node, stree.getPt(), log);
-						pss.getTree().replaceTreeNodeUsingPath(subtree, curr_path, 0);
-						System.out.println("Saved biggest pss:\n" + saved_pss.getTree().tree_to_string());
-						System.out.println("New Tree representing the string " + pss.getTree().getTerminals() + ":\n" + pss.getTree().tree_to_string());
+						pss.getHdd_tree().replaceTreeNodeUsingPath(subtree, curr_path, 0);
+						System.out.println("Saved biggest pss:\n" + saved_pss.getHdd_tree().tree_to_string());
+						System.out.println("New Tree representing the string " + pss.getHdd_tree().getTerminals() + ":\n" + pss.getHdd_tree().tree_to_string());
 						// Check if the subtree has at least one terminal character outside of <anychars> block and is not empty or equals a space character
-						if(checkIfAtLeastOneNonAnychar(pss.getTree(), excludeSet, log) && 
-								(!(pss.getTree().getTerminals().equals("") || 
-								pss.getTree().getTerminals().equals(" "))) &&
-								pss.getTree().getTerminals().length() <= saved_pss.getTree().getTerminals().length()) {
+						if(checkIfAtLeastOneNonAnychar(pss.getHdd_tree(), excludeSet, log) && 
+								(!(pss.getHdd_tree().getTerminals().equals("") || 
+								pss.getHdd_tree().getTerminals().equals(" "))) &&
+								pss.getHdd_tree().getTerminals().length() <= saved_pss.getHdd_tree().getTerminals().length()) {
 							if(checkJSON(pss, log)) {
 								// Results in us having a new set of characters that we can try to parse using the adjusted grammar
 								// Now we have to check if the modified terminals can be parsed again using the adjusted grammar
-								if(checkIfGGFails(pss.getTree().getTerminals(), log)) {
+								if(checkIfGGFails(getGolden_grammar_EP(), pss.getHdd_tree().getTerminals())) {
 									new_path = new ArrayList<Integer>();
-									new_path = pss.getTree().getPathForNewMergedTree(subtree, new ArrayList<Integer>());
+									new_path = pss.getHdd_tree().getPathForNewMergedTree(subtree, new ArrayList<Integer>());
 									path_to_symbols.clear();
-									pss.getTree().getPathListForSymbols(new ArrayList<Integer>(), 0, path_to_symbols);
+									pss.getHdd_tree().getPathListForSymbols(new ArrayList<Integer>(), 0, path_to_symbols);
 									if(log) {
 										System.out.format("Replace the biggest node with:\n%s\n", subtree.tree_to_string());
 									}
 									biggest_node = subtree; 
 									if(log) {
-										System.out.println("Set new \"Minimized string using HDD\": " + pss.getTree().getTerminals()); // Created string = hdd string; we set the hdd string
+										System.out.println("Set new \"Minimized string using HDD\": " + pss.getHdd_tree().getTerminals()); // Created string = hdd string; we set the hdd string
 									}
 									reprocess = subtree;
-									result = pss.getTree().getTerminals();
+									result = pss.getHdd_tree().getTerminals();
 									// TODO BREAK OUTER LOOP
 									break Outer_loop;
 								}
@@ -115,7 +115,7 @@ public class HDD {
 						if(log) {
 							System.out.println("Undo changes; restore biggest node and tree");
 						}
-						pss.setTree(new ParseTree(saved_pss.getTree()));
+						pss.setHdd_tree(new ParseTree(saved_pss.getHdd_tree()));
 						biggest_node = saved_biggest_node;
 //						System.out.println("Undone changes. Biggest node:\n" + biggest_node.tree_to_string());
 //						System.out.println("Master tree:\n" + pss.getTree().tree_to_string());
@@ -154,7 +154,7 @@ public class HDD {
 	}
 	
 	private boolean checkJSON(ParsedStringSettings pss, boolean log) {
-		String terminals = pss.getTree().getTerminals();
+		String terminals = pss.getHdd_tree().getTerminals();
 		// terminals = "[R14^y]";
 		if(terminals.startsWith("{")) {
 			try {
@@ -187,22 +187,18 @@ public class HDD {
 	 * If so return false
 	 * Return true otherwise
 	 * */
-	private Boolean checkIfGGFails(String adjusted_string, boolean log) {
-		try {
-			this.getGolden_grammar_PL().check_string(adjusted_string, this.getGolden_grammar_EP()); // Try to parse the string; return value can be obtained
-			return false;
-		} catch (Exception e) {
-			return true;
-		}
+	private Boolean checkIfGGFails(EarleyParser ep, String adjusted_string) {
+		// Negation as we want to check if the GG FAILS; hence we must negate the result
+		return !Fuzzer.checkIfStringCanBeParsedWithGivenGrammar(ep, adjusted_string);
 	}
 	
 	public ParsedStringSettings startHDD(ParsedStringSettings pss, HashSet<String> excludeSet, ParserLib golden_grammar_PL, EarleyParser golden_grammar_EP, boolean log){		
 		if(log) {
-			System.out.printf("Applying HDD\nID: %s\nString to minimize: %s\nTree to minimize:\n%s\n", pss.hashCode(), pss.getCreated_string(), pss.getTree().tree_to_string());
+			System.out.printf("Applying HDD\nID: %s\nString to minimize: %s\nTree to minimize:\n%s\n", pss.hashCode(), pss.getCreated_string(), pss.getHdd_tree().tree_to_string());
 		}
 		this.setGolden_grammar_PL(golden_grammar_PL);
 		this.setGolden_grammar_EP(golden_grammar_EP);
-		String result = perses_delta_debug(pss.getTree(), pss.getPl().grammar, pss, pss, excludeSet, log);
+		String result = perses_delta_debug(pss.getHdd_tree(), pss.getPl().grammar, pss, pss, excludeSet, log);
 		pss.setHdd_string(result);
 		if(log) {
 			System.out.println("Updated HDD string: " + result);

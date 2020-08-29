@@ -8,6 +8,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Random;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
@@ -69,13 +70,12 @@ public class Fuzzer {
 	private HashSet<ParseTree> dd_random_trees_set_check = new HashSet<ParseTree>();
 	
 	private boolean log = true;
-	private final int MAX_INPUT_LENGTH = 20; // Sets the maximal input length when creating a string
+	private final int MAX_INPUT_LENGTH = 30; // Sets the maximal input length when creating a string
 	private HashSet<String> exclude_grammars = new HashSet<>(Arrays.asList("<anychar>", "<anychars>", "<anycharsp>", "<anycharp>"));
 	
 	
 	// TODO 
 	/* - change printable to all characters
-	 * - adjust hdd so that it will run with the lazyextractor
 	 * - adjust the simpleddset similar to hdd and check the simpleddset
 	 * - check integration of DD
 	 * 		- extend DD such that the correct part of the tree gets removed (needed for simpleDDSET)
@@ -84,7 +84,7 @@ public class Fuzzer {
 	public static void main(String[] args) {
 		Fuzzer fuzzer = new Fuzzer("", 0, null, args[0], null); // Create new Fuzzer; initialize grammar
 		try {
-			fuzzer.create_valid_strings(3, fuzzer.log); // Create 20 valid strings; no log level enabled
+			fuzzer.create_valid_strings(1000, fuzzer.log); // Create 20 valid strings; no log level enabled
 			// Print out the strings that have been found
 			for(Map.Entry<String, ArrayList<String>> entry : fuzzer.getValid_strings().entrySet()) {
 				String key = entry.getKey();
@@ -149,6 +149,7 @@ public class Fuzzer {
 		 * 
 		 * */
 		int i = 0;
+		// JSONArray jsonarray = new JSONArray();
 		while (true) {
 			initializeGoldenGrammar();
 //			parseStringUsingLazyExtractor("12 + a2", this.golden_grammar_EP);
@@ -157,45 +158,29 @@ public class Fuzzer {
 			String created_string = generate(log_level); // Generate a new valid JSON Object, according to org.json.JSONObject
 			if(created_string != null) {
 				// Check if the created string is also valid according to the "golden grammar"
-		        try {
-		        	created_string = "[599Dti5Mjo4~1x%sZp]";
-		        	System.out.println("\nCreated string [" + (i + 1) + "]: " + created_string);
-	        		for(ParseTree pt : this.getCurr_pl().parse_string(created_string, this.getCurr_ep())) {
-	        			if(pt != null) {
-	        				// Parsed successfully using the golden grammar
-	        				// There is no need to loop over the rest of the loop as we have one valid result
-	        				if(this.log) {
-	        					System.out.println("String " + created_string + " successfully parsed using the original golden grammar... Continuing");
-	        					System.out.println("Tree: \n");
-	        					this.getCurr_pl().show_tree(pt);
-	        				}
-	        				// Break and generate a new string
-	        				break;
-	        			}
-	        		}
-		            // ParseTree result = this.getCurr_pl().parse_string(created_string, this.getCurr_ep()); // Try to parse the string
-		            // this.getCurr_pl().show_tree(result);
-		            // this.setTree_key(this.getCurr_pl().save_tree(result, 0));
-		            // The string has been parsed successfully and thus we just continue...
-		            // System.exit(0);
-		        } catch (Exception e) { 
+				created_string = "[599Dti5Mjo4~1x%sZp]";
+//				created_string = "12 + a2";
+//	        	Fuzzer.parseStringUsingLazyExtractor(created_string, this.getCurr_ep(), 2000);
+		        if(checkIfStringCanBeParsedWithGivenGrammar(this.getCurr_ep(), created_string)) {
+		        	continue;
+		        } else { 
 		        	// The string has not been parsed successfully
 		        	// Hence the string is valid for org.json.JSONObject 
 		        	// but is not according to the golden grammar
 		            // Change the golden grammar until the string can be parsed
-		        	// System.out.println("Failed by the GG " + e.toString());
-		        	change_everything_except_anychar_one_after_another(created_string);
 		        	i++;
-		        	// Now we try to get the smallest input that is causing the error/exception
-		        	// TODO
-		        	System.out.println("\n");
-		        	// System.exit(0);
+		        	System.out.println("Created string [" + (i) + "]: " + created_string);
+		        	change_everything_except_anychar_one_after_another(created_string);
+		        	// jsonarray.put(created_string);
+		        	// System.out.println("\n");
 		        }
 				if(i >= n) { // Did we create enough valid strings?
 					break;
 				}
 			}
 		}
+		// System.out.printf("%s", jsonarray);
+		// System.exit(0);
 		// Simple DDSET
 		SimpleDDSET sddset = new SimpleDDSET();
 		for(Map.Entry<String, ArrayList<ParseTree>> entry : dd_random_trees.entrySet()) {
@@ -210,7 +195,16 @@ public class Fuzzer {
 		}
 	}
 	
-	
+	public static boolean checkIfStringCanBeParsedWithGivenGrammar(EarleyParser ep, String input_string) {
+		// Checks if the given string can be parsed with the given grammar of the EarleyParser
+		try {
+			ChoiceNode choices = new ChoiceNode(null, 1, 0);
+			new LazyExtractor(ep, input_string, choices, 1);
+			return true;
+		} catch (Exception e) {
+			return false;
+		}
+	}
 	private void initializeGoldenGrammar() {
 		try {
 			if(this.log) {
@@ -259,7 +253,7 @@ public class Fuzzer {
                 		List<Object> lst_obj = getBestParseTreeForAdjustedState(state, master, gRuleC, elemC, created_string);
                 		if(lst_obj != null) {
                 			ParseTree best_tree = (ParseTree) lst_obj.get(0);
-                			int length_of_anychar_chars = (int) lst_obj.get(1);
+                			// int length_of_anychar_chars = (int) lst_obj.get(1); UNUSED ATM
 							@SuppressWarnings("unchecked")
 							TreeMap<Integer, Integer> sorted_pos_length_lst = (TreeMap<Integer, Integer>) lst_obj.get(2);
                 			ParsedStringSettings pss = createPssForBestTree(best_tree, sorted_pos_length_lst, created_string, state, master, gRuleC, elemC, entry, null);
@@ -267,7 +261,7 @@ public class Fuzzer {
                 	            HDD hdd = new HDD();
                 	            hdd.startHDD(pss, this.getExclude_grammars(), this.getGolden_grammar_PL(), this.getGolden_grammar_EP(), this.log);
                 	            MinimizeAnychar ma = new MinimizeAnychar();
-                	            ma.startDD(pss, getGolden_grammar_EP(), getGolden_grammar_PL());
+                	            ma.startDD(pss, getGolden_grammar_EP(), getGolden_grammar_PL(), this.getCurr_ep());
                 	            addMinimalInputToList(pss);
                     		}
                     		else {
@@ -296,14 +290,16 @@ public class Fuzzer {
         		List<Object> lst_obj = getBestParseTreeForAdjustedState(state, created_string, anycharsp);
         		if(lst_obj != null) {
         			ParseTree best_tree = (ParseTree) lst_obj.get(0);
-        			int length_of_anychar_chars = (int) lst_obj.get(1);
+        			// int length_of_anychar_chars = (int) lst_obj.get(1); // UNUSED ATM
 					@SuppressWarnings("unchecked")
 					TreeMap<Integer, Integer> sorted_pos_length_lst = (TreeMap<Integer, Integer>) lst_obj.get(2);
         			ParsedStringSettings pss = createPssForBestTree(best_tree, sorted_pos_length_lst, created_string, state, master, -1, -1, entry, anycharsp);
         			if(pss != null) {
         	            HDD hdd = new HDD();
         	            hdd.startHDD(pss, this.getExclude_grammars(), this.getGolden_grammar_PL(), this.getGolden_grammar_EP(), true);
-        	            addMinimalInputToList(pss);
+        	            MinimizeAnychar ma = new MinimizeAnychar();
+        	            ma.startDD(pss, getGolden_grammar_EP(), getGolden_grammar_PL(), this.getCurr_ep());
+        	            addMinimalInputToList(pss);        	            
             		}
              		else {
             			if(this.log) {
@@ -312,7 +308,7 @@ public class Fuzzer {
             		}
         		}
 			} catch (Exception e) {
-				
+				System.out.println("change_everything_except_anychar_one_after_another, anycharsp: " + e.toString());
 			}
     		
     	}
@@ -361,12 +357,16 @@ public class Fuzzer {
             		created_string,
             		sb_created_string.toString(),
             		"",
+            		"",
             		pt.count_nodes(0, this.getExclude_grammars()),
             		pt.count_leafes(),
             		state, 
             		entry.getValue().get(gRuleC), 
-            		entry.getValue().get(gRuleC).get(elemC), 
+            		entry.getValue().get(gRuleC).get(elemC),
+            		new ParseTree(pt),
             		pt, 
+            		null,
+            		null,
             		this.getCurr_pl(),
             		this.getParsed_data_type());
 		}
@@ -375,12 +375,16 @@ public class Fuzzer {
 	            		created_string,
 	            		sb_created_string.toString(),
 	            		"",
+	            		"",
 	            		pt.count_nodes(0, this.getExclude_grammars()),
 	            		pt.count_leafes(),
 	            		state, 
 	            		null, 
-	            		"ADDED RULE <ANYCHARSP>", 
-	            		pt, 
+	            		"ADDED RULE <ANYCHARSP>",
+	            		new ParseTree(pt),
+	            		pt,
+	            		null,
+	            		null,
 	            		this.getCurr_pl(),
 	            		this.getParsed_data_type());
 		}
@@ -518,7 +522,6 @@ public class Fuzzer {
 			if(this.log) {
 				System.out.printf("Added <anycharsp> to %s\n", state);
 			}
-			
 			ep_adjusted = new EarleyParser(pl_adjusted.grammar);
 			this.setCurr_pl(pl_adjusted);
     		this.setCurr_ep(ep_adjusted);
@@ -608,7 +611,7 @@ public class Fuzzer {
 			}
 			setRv(complete); // Set the return value to complete
 		} catch (Exception e) {
-			System.out.printf("Error: %s\n", e.toString());
+			// System.out.printf("Error: %s\n", e.toString());
 			String msg = e.toString();			
 			ArrayList<Integer> numbers = getNumbersFromErrorMessage(msg);
 			if(msg.contains(text_must_begin_with)) { // Should never be the case after the program flow adjustment
@@ -704,7 +707,7 @@ public class Fuzzer {
 			}
 			setRv(complete); // Set the return value to complete
 		} catch (Exception e) {
-			System.out.printf("Error: %s\n", e.toString());
+			// System.out.printf("Error: %s\n", e.toString());
 			String msg = e.toString();			
 			ArrayList<Integer> numbers = getNumbersFromErrorMessage(msg);
 			if(msg.contains(text_must_begin_with_array)) {
@@ -805,7 +808,7 @@ public class Fuzzer {
 		 * (depending on which printable is used)
 		 * */
 		ArrayList<Character> tmp_char_set = new ArrayList<Character>();
-//		char[] set_of_chars = printable_with_special_characters();
+		// char[] set_of_chars = printable_with_special_characters();
 		char[] set_of_chars = printable();
 		for(char c : set_of_chars) {
 			tmp_char_set.add(c);
@@ -824,6 +827,8 @@ public class Fuzzer {
 		 * */
 		ArrayList<Character> set_of_chars = getChar_set();
 		int idx = ThreadLocalRandom.current().nextInt(0, set_of_chars.size()); // Get a random character between 0 and the size of the set
+		// Random rand = new Random();
+		// int idx = rand.nextInt(set_of_chars.size());
 		char input_char = set_of_chars.get(idx); // Set the return value to the character
 		getChar_set().remove(idx); // And remove the character from the list
 		if(log_level) {

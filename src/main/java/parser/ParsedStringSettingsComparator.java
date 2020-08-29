@@ -11,10 +11,10 @@ public class ParsedStringSettingsComparator implements Comparator<ParsedStringSe
 		 * Return -1 if the first object is "smaller" than the second object
 		 * 
 		 * */
-		if(o1.getRemoved_anychar_string().length() < o2.getRemoved_anychar_string().length()) {
+		if(o1.getString_after_removing_anychars().length() < o2.getString_after_removing_anychars().length()) {
 			return 1;
 		}
-		else if(o1.getRemoved_anychar_string().length() > o2.getRemoved_anychar_string().length()) {
+		else if(o1.getString_after_removing_anychars().length() > o2.getString_after_removing_anychars().length()) {
 			return -1;
 		}
 		else {

@@ -150,7 +150,7 @@ public class SimpleDDSET {
 		ArrayList<Integer> path = new ArrayList<Integer>();
 		path.add(0);
 		path.add(0);
-		generalize(pss.getTree(), path, pss.getData_type());
+		generalize(pss.getHdd_tree(), path, pss.getData_type());
 		System.out.println(String.format("Abstracted the tree:\n%s\n", pss.toString()));
 		return null;
 	}

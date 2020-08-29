@@ -816,6 +816,87 @@ class ParseTree{
 		
 	}
 	
+	private ArrayList<Integer> representing_char = new ArrayList<Integer>();
+	public int setRepresentingChar(int char_counter) {
+		// String string_represented_by_tree = this.getTerminals(); // Return the terminals that this string is representing
+		for(int i = 0; i < this.getTerminals().length(); i++) {
+			this.representing_char.add(i + char_counter);
+		}
+		for(ParseTree pt : this.children) {
+			if(!pt.is_nt()) { // If terminal, increase the char_counter as the child of pt would then be a character
+				char_counter++;
+			} else {
+				char_counter = pt.setRepresentingChar(char_counter);
+			}
+		}
+		return char_counter;
+	}
+	
+    private String _dd_tree_with_representing_list(int indent, String tree) {
+    	tree += "\t".repeat(indent) + this.name + "\t" + this.representing_char.toString();
+        for (ParseTree p : this.children) {
+            tree = p._dd_tree_with_representing_list(indent + 1, tree + "\n");
+        }
+        return tree;
+    }
+
+    public String dd_tree_with_representing_list() {
+    	return this._dd_tree_with_representing_list(0, "");
+    }
+
+	public List<Object> removeTreesNotRepresentedByArray(List<Integer> result, int deleted) {
+		try {
+			System.out.printf("%s: %s, keep numbers: %s\n", this.name, this.representing_char, result);
+			boolean delete_child = false;
+			if(this.representing_char.size() == 1) { // Tree is only representing one character; should always be the case due to the structure of anychar
+				if(!result.contains(this.representing_char.get(0))) { // If the character that is being represented by this tree
+					// is not in the result, we will delete the children of the parent tree linking to this tree
+					List<Object> obj = new ArrayList<Object>();
+					obj.add(0, true); // delete the children
+					obj.add(++deleted);
+					return obj;
+				}
+			}
+			ArrayList<Object> obj = null;
+			ArrayList<Integer> child_pos_to_delte = new ArrayList<Integer>();
+			for(int x = 0; x < this.children.size(); x++) {
+				ParseTree pt = this.children.get(x);
+				if(pt.is_nt()) { // We are not interested in the terminals
+					obj = (ArrayList<Object>) pt.removeTreesNotRepresentedByArray(result, deleted);
+					if(obj != null) {
+						if((boolean) obj.get(0)) {
+							delete_child = true;
+							deleted += (int) obj.get(1);
+							child_pos_to_delte.add(x);
+						}
+					}
+				}
+			}
+			if(delete_child) {
+				if(child_pos_to_delte.size() == this.children.size()) { // If all childrens have to be deleted, just replace the the childrens with an empty list
+					this.children = new ArrayList<ParseTree>();
+				} else { // Otherwise rearrange the ParseTrees within the children list
+					int children_size = children.size();
+					for(int j = 0; j < children_size; j++) {
+						if(child_pos_to_delte.contains(j)) { // If child on position J in the children list should be removed
+							if(!child_pos_to_delte.contains(j+1)) { // check if we can replace it with the next element
+								for(int z = j + 1, y = j; z + 1 < children_size; z++, y++) { // Check if there exists a child on pos j+1 and shift any following child
+									this.children.set(y, this.children.get(z));
+								}
+							}
+						}
+					}
+				}
+			}
+			// Rearrange children list (if child 1 gets deleted and child 2 not, move child 2 to the position of child one
+			return obj;
+		} catch (Exception e) {
+			System.out.printf("removeTreesNotRepresentedByArray: %s\n%s", this.name, e.toString());
+			return null;
+		}
+		
+	}
+	
 }
 
 class ParseForest implements Iterable<ParseTree> {
@@ -1581,7 +1662,10 @@ class LazyExtractor{
 			ler = extract_a_node(this.my_forest, seen, this.choices, null);
 			if(ler.getParsetree() != null) {
 				counter++;
-//				System.out.printf("Tree[%d]:\n%s\n", counter++, ler.getParsetree().tree_to_string());
+				if(counter % 200 == 0) {
+					System.out.printf("Tree[%d]:\n%s\n", counter, ler.getParsetree().tree_to_string());
+				}
+//				 System.out.printf("Tree[%d]:\n%s\n", counter, ler.getParsetree().tree_to_string());
 			}
 			// ChoiceNode c = ler.getChoicenode();
 			if(ler.getPostree() != null) {
