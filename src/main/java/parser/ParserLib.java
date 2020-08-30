@@ -858,34 +858,49 @@ class ParseTree{
 				}
 			}
 			ArrayList<Object> obj = null;
-			ArrayList<Integer> child_pos_to_delte = new ArrayList<Integer>();
+			ArrayList<Integer> child_pos_to_delete = new ArrayList<Integer>();
 			for(int x = 0; x < this.children.size(); x++) {
 				ParseTree pt = this.children.get(x);
 				if(pt.is_nt()) { // We are not interested in the terminals
-					obj = (ArrayList<Object>) pt.removeTreesNotRepresentedByArray(result, deleted);
+					ArrayList<Object> tmp_obj = (ArrayList<Object>) pt.removeTreesNotRepresentedByArray(result, deleted);
+					if(tmp_obj != null) {
+						obj = tmp_obj;
+					} else {
+						continue;
+					}
 					if(obj != null) {
 						if((boolean) obj.get(0)) {
 							delete_child = true;
 							deleted += (int) obj.get(1);
-							child_pos_to_delte.add(x);
+							child_pos_to_delete.add(x);
 						}
 					}
 				}
 			}
 			if(delete_child) {
-				if(child_pos_to_delte.size() == this.children.size()) { // If all childrens have to be deleted, just replace the the childrens with an empty list
+				if(child_pos_to_delete.size() == this.children.size()) { // If all childrens have to be deleted, just replace the the childrens with an empty list
+					System.out.printf("Delete all childrens for %s\n", this.name);
 					this.children = new ArrayList<ParseTree>();
-				} else { // Otherwise rearrange the ParseTrees within the children list
+				} else { // Otherwise first "delete" the child, then rearrange the ParseTrees within the children list
+					obj.set(0, false); // If there are childrens left in this node, do not delete the whole node
+					System.out.printf("Set delete to false for this tree");
+					for(int pos : child_pos_to_delete) {
+						System.out.printf("Delete child %d:\n%s\n", pos, this.children.get(pos));
+						this.children.remove(pos);
+					}
+					/*
+					obj.set(0, false); // If there are childrens left in this node, do not delete the whole node
 					int children_size = children.size();
 					for(int j = 0; j < children_size; j++) {
-						if(child_pos_to_delte.contains(j)) { // If child on position J in the children list should be removed
-							if(!child_pos_to_delte.contains(j+1)) { // check if we can replace it with the next element
+						if(child_pos_to_delete.contains(j)) { // If child on position J in the children list should be removed
+							if(!child_pos_to_delete.contains(j+1)) { // check if we can replace it with the next element
 								for(int z = j + 1, y = j; z + 1 < children_size; z++, y++) { // Check if there exists a child on pos j+1 and shift any following child
 									this.children.set(y, this.children.get(z));
 								}
 							}
 						}
 					}
+					*/
 				}
 			}
 			// Rearrange children list (if child 1 gets deleted and child 2 not, move child 2 to the position of child one

@@ -152,6 +152,9 @@ public class Fuzzer {
 		// JSONArray jsonarray = new JSONArray();
 		while (true) {
 			initializeGoldenGrammar();
+			LimitFuzzer lf = new LimitFuzzer(this.getCurr_ep().grammar);
+			lf.fuzz("<start>", 10);
+			
 //			parseStringUsingLazyExtractor("12 + a2", this.golden_grammar_EP);
 //			System.exit(0);
 			createRandomTrees(10);
