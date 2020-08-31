@@ -56,7 +56,7 @@ public class MinimizeAnychar {
 			pss.setDd_string(sb.toString());
 			pss.getDd_tree().setRepresentingChar(0);
 			System.out.printf("Tree:\n%s\n", pss.getDd_tree().dd_tree_with_representing_list());
-			List<Object> obj = pss.getDd_tree().removeTreesNotRepresentedByArray(result, 0);
+			List<Object> obj = pss.getDd_tree().removeTreesNotRepresentedByGivenArray(result, 0);
 			if(obj != null) {
 				assert hdd_string.size() - result.size() == (int) obj.get(1);
 			}

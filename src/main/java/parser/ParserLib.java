@@ -844,7 +844,7 @@ class ParseTree{
     	return this._dd_tree_with_representing_list(0, "");
     }
 
-	public List<Object> removeTreesNotRepresentedByArray(List<Integer> result, int deleted) {
+	public List<Object> removeTreesNotRepresentedByGivenArray(List<Integer> result, int deleted) {
 		try {
 			System.out.printf("%s: %s, keep numbers: %s\n", this.name, this.representing_char, result);
 			boolean delete_child = false;
@@ -862,7 +862,7 @@ class ParseTree{
 			for(int x = 0; x < this.children.size(); x++) {
 				ParseTree pt = this.children.get(x);
 				if(pt.is_nt()) { // We are not interested in the terminals
-					ArrayList<Object> tmp_obj = (ArrayList<Object>) pt.removeTreesNotRepresentedByArray(result, deleted);
+					ArrayList<Object> tmp_obj = (ArrayList<Object>) pt.removeTreesNotRepresentedByGivenArray(result, deleted);
 					if(tmp_obj != null) {
 						obj = tmp_obj;
 					} else {
@@ -1678,7 +1678,8 @@ class LazyExtractor{
 			if(ler.getParsetree() != null) {
 				counter++;
 				if(counter % 200 == 0) {
-					System.out.printf("Tree[%d]:\n%s\n", counter, ler.getParsetree().tree_to_string());
+					// System.out.printf("Tree[%d]:\n%s\n", counter, ler.getParsetree().tree_to_string());
+					System.out.printf("Tree[%d]:\n", counter);
 				}
 //				 System.out.printf("Tree[%d]:\n%s\n", counter, ler.getParsetree().tree_to_string());
 			}

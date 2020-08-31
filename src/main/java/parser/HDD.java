@@ -88,7 +88,7 @@ public class HDD {
 								(!(pss.getHdd_tree().getTerminals().equals("") || 
 								pss.getHdd_tree().getTerminals().equals(" "))) &&
 								pss.getHdd_tree().getTerminals().length() <= saved_pss.getHdd_tree().getTerminals().length()) {
-							if(checkJSON(pss, log)) {
+							if(checkIfJSONPasses(pss, log)) {
 								// Results in us having a new set of characters that we can try to parse using the adjusted grammar
 								// Now we have to check if the modified terminals can be parsed again using the adjusted grammar
 								if(checkIfGGFails(getGolden_grammar_EP(), pss.getHdd_tree().getTerminals())) {
@@ -153,7 +153,7 @@ public class HDD {
 		
 	}
 	
-	private boolean checkJSON(ParsedStringSettings pss, boolean log) {
+	private boolean checkIfJSONPasses(ParsedStringSettings pss, boolean log) {
 		String terminals = pss.getHdd_tree().getTerminals();
 		// terminals = "[R14^y]";
 		if(terminals.startsWith("{")) {

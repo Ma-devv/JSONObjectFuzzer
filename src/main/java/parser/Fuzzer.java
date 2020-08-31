@@ -84,7 +84,7 @@ public class Fuzzer {
 	public static void main(String[] args) {
 		Fuzzer fuzzer = new Fuzzer("", 0, null, args[0], null); // Create new Fuzzer; initialize grammar
 		try {
-			fuzzer.create_valid_strings(1000, fuzzer.log); // Create 20 valid strings; no log level enabled
+			fuzzer.create_valid_strings(1, fuzzer.log); // Create 20 valid strings; no log level enabled
 			// Print out the strings that have been found
 			for(Map.Entry<String, ArrayList<String>> entry : fuzzer.getValid_strings().entrySet()) {
 				String key = entry.getKey();
@@ -97,32 +97,6 @@ public class Fuzzer {
 		} catch (Exception e) {
 			System.out.println("Something went wrong...\nError: " + e);
 			System.exit(1);
-		}
-		
-	}
-
-	private void createRandomTrees(int i) {
-		// Filles the list for SimpleDDSET
-		// Temporarily
-		ArrayList<String> tmp = new ArrayList<String>();
-		tmp.add("{\"as\": 1}");
-		tmp.add("{true}");
-		tmp.add("{\"-asdöasd\": \"alöksdqdq\"}");
-		tmp.add("{\"112\":true}");
-		tmp.add("{}");
-		tmp.add("[1,2,3,4,5,6]");
-		tmp.add("[true, false, {}, 1, 2]");
-		tmp.add("[{}]");
-		tmp.add("[]");
-		tmp.add("[[], 1, 2, [1,2,3]]");
-		for(String s : tmp) {
-			try {
-				for(ParseTree p : this.getCurr_pl().parse_string(s, this.getCurr_ep())) {
-					addElementsOfParseTreeToRandomList(p, "");
-				}
-			} catch (Exception e) {
-				
-			}
 		}
 		
 	}
@@ -152,12 +126,6 @@ public class Fuzzer {
 		// JSONArray jsonarray = new JSONArray();
 		while (true) {
 			initializeGoldenGrammar();
-			LimitFuzzer lf = new LimitFuzzer(this.getCurr_ep().grammar);
-			lf.fuzz("<start>", 10);
-			
-//			parseStringUsingLazyExtractor("12 + a2", this.golden_grammar_EP);
-//			System.exit(0);
-			createRandomTrees(10);
 			String created_string = generate(log_level); // Generate a new valid JSON Object, according to org.json.JSONObject
 			if(created_string != null) {
 				// Check if the created string is also valid according to the "golden grammar"
@@ -194,7 +162,7 @@ public class Fuzzer {
    		// Sort the list
 		Collections.sort(this.getListForEasiestMod(), new ParsedStringSettingsComparator());
 		for(ParsedStringSettings pss : this.getListForEasiestMod()) {
-			sddset.abstractTree(pss, getExclude_grammars(), dd_random_trees);
+			sddset.abstractTree(pss, getExclude_grammars(), this.getGolden_grammar_EP());
 		}
 	}
 	
@@ -266,6 +234,8 @@ public class Fuzzer {
                 	            MinimizeAnychar ma = new MinimizeAnychar();
                 	            ma.startDD(pss, getGolden_grammar_EP(), getGolden_grammar_PL(), this.getCurr_ep());
                 	            addMinimalInputToList(pss);
+                	            SimpleDDSET sddset = new SimpleDDSET();
+                	            sddset.abstractTree(pss, getExclude_grammars(), this.getGolden_grammar_EP());
                     		}
                     		else {
                     			if(this.log) {
@@ -318,7 +288,6 @@ public class Fuzzer {
     	if(true) {
     		System.out.println("\n\nDone with adjusting the grammar for " + created_string + "\n\n");
 		}
-    	System.exit(0);
 	}
 	
 	private ParsedStringSettings createPssForBestTree(ParseTree pt, TreeMap<Integer, Integer> sorted_pos_length_lst, String created_string, String state, HashMap<String, GDef> master, int gRuleC, int elemC, Entry<String, GDef> entry, GRule anycharsp) {
@@ -391,29 +360,6 @@ public class Fuzzer {
 	            		this.getCurr_pl(),
 	            		this.getParsed_data_type());
 		}
-	}
-
-	private void addElementsOfParseTreeToRandomList(ParseTree pt, String state) {
-		// Add each subtree of the tree to the Simple DDSET list except the nodes that equal the state as the rule is adjusted
-		if(!pt.name.equals(state) && !exclude_grammars.contains(pt.name) && pt.is_nt()) { // Check if the current name equals state
-			if(this.getDd_random_trees().containsKey(pt.name)) { // Check if we there is already an element for the tree name
-				if(!this.getDd_random_trees_set_check().contains(pt)) {
-					this.getDd_random_trees_set_check().add(pt);
-					this.getDd_random_trees().get(pt.name).add(pt); // If so, add the ParseTree to the Set
-				}
-			} else { // If not, create one and add the tree
-				ArrayList<ParseTree> pt_lst = new ArrayList<ParseTree>();
-				pt_lst.add(pt);
-				this.getDd_random_trees_set_check().add(pt);
-				this.getDd_random_trees().put(pt.name, pt_lst);
-			}
-		}
-		for(ParseTree p : pt.children) {
-			HashSet<String> tmp = new HashSet<String>();
-			if(p.count_nodes(0, tmp) > 4) {
-				addElementsOfParseTreeToRandomList(p, state);
-			}
-		}		
 	}
 
 	private void addMinimalInputToList(ParsedStringSettings pss) {
@@ -497,7 +443,7 @@ public class Fuzzer {
 			ep_adjusted = new EarleyParser(pl_adjusted.grammar);
 			this.setCurr_pl(pl_adjusted);
 			this.setCurr_ep(ep_adjusted);
-			return parseStringUsingLazyExtractor(created_string, this.getCurr_ep(), 2000);
+			return parseStringUsingLazyExtractor(created_string, this.getCurr_ep(), 1000);
 		} catch (Exception e) {
 			if(this.log) {
 				System.out.println("Failed to parse the string using the adjusted grammar; error: " + e.toString());
@@ -528,7 +474,7 @@ public class Fuzzer {
 			ep_adjusted = new EarleyParser(pl_adjusted.grammar);
 			this.setCurr_pl(pl_adjusted);
     		this.setCurr_ep(ep_adjusted);
-			return parseStringUsingLazyExtractor(created_string, this.getCurr_ep(), 2000);
+			return parseStringUsingLazyExtractor(created_string, this.getCurr_ep(), 1000);
 		} catch (Exception e) {
   			if(this.log) {
 				System.out.println("Failed to parse the string using the adjusted grammar; error: " + e.toString());
