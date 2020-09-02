@@ -226,6 +226,7 @@ public class SimpleDDSET {
 		path.add(0);
 		ParseTree abstracted_tree = generalize(pss.getDd_tree(), path, earleyParserGG);
 		pss.setAbstracted_tree(abstracted_tree);
+		pss.setAbstracted_string(abstracted_tree.getAbstractedString(""));
 //		System.out.println(String.format("Abstracted the tree:\n%s\n", pss.toString()));
 	}
 }

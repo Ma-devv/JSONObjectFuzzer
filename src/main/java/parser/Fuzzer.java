@@ -1,4 +1,5 @@
 package parser;
+import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -131,7 +132,7 @@ public class Fuzzer {
 			if(created_string != null) {
 				// Check if the created string is also valid according to the "golden grammar"
 //				created_string = "{ea 92HPPf&c.:$PL}";
-//				created_string = "12 + a2";
+//				created_string = "[b),QL2\b]";
 //	        	Fuzzer.parseStringUsingLazyExtractor(created_string, this.getCurr_ep(), 2000);
 		        if(checkIfStringCanBeParsedWithGivenGrammar(this.getCurr_ep(), created_string)) {
 		        	continue;
@@ -203,7 +204,8 @@ public class Fuzzer {
     	for(Map.Entry<String, GDef> entry : master.entrySet()) { //
     		counter++;
     		String state = entry.getKey().toString();
-    		System.out.println("\n\n----STATE " + counter + "/" + master.size() + ": " + state + "----");
+    		Date date = new Date();
+    		System.out.println("\n\n----STATE " + counter + "/" + master.size() + ": " + state + " starting at " + new Timestamp(date.getTime()) + "----");
     		
     		if(this.getExclude_grammars().contains(state)) {
     			if(this.log) {
@@ -275,6 +277,18 @@ public class Fuzzer {
         	            ma.startDD(pss, getGolden_grammar_EP(), getGolden_grammar_PL(), this.getCurr_ep()); 	
         	            SimpleDDSET sddset = new SimpleDDSET();
         	            sddset.abstractTree(pss, getExclude_grammars(), this.getGolden_grammar_EP());
+//        	            System.out.printf(""
+//        	            		+ "ID: %d\n"
+//        	            		+ "Generated string: %s\n"
+//        	            		+ "HDD string: %s\n"
+//        	            		+ "DD string: %s\n"
+//        	            		+ "Abstracted string: %s\n", 
+//        	            		pss.hashCode(),
+//        	            		pss.getCreated_string(),
+//        	            		pss.getHdd_string(),
+//        	            		pss.getDd_string(),
+//        	            		pss.getAbstracted_tree().getAbstractedString("")
+//        	            		);
         	            if(pss.getAbstracted_string().contains("<") && pss.getAbstracted_string().contains(">")) { // Was the abstraction successful?
         	            	addMinimalInputToList(pss);
         	            }
@@ -465,7 +479,7 @@ public class Fuzzer {
 			ep_adjusted = new EarleyParser(pl_adjusted.grammar);
 			this.setCurr_pl(pl_adjusted);
 			this.setCurr_ep(ep_adjusted);
-			return parseStringUsingLazyExtractor(created_string, this.getCurr_ep(), 1000);
+			return parseStringUsingLazyExtractor(created_string, this.getCurr_ep(), 100);
 		} catch (Exception e) {
 			if(this.log) {
 				System.out.println("Failed to parse the string using the adjusted grammar; error: " + e.toString());
@@ -496,7 +510,7 @@ public class Fuzzer {
 			ep_adjusted = new EarleyParser(pl_adjusted.grammar);
 			this.setCurr_pl(pl_adjusted);
     		this.setCurr_ep(ep_adjusted);
-			return parseStringUsingLazyExtractor(created_string, this.getCurr_ep(), 1000);
+			return parseStringUsingLazyExtractor(created_string, this.getCurr_ep(), 100);
 		} catch (Exception e) {
   			if(this.log) {
 				System.out.println("Failed to parse the string using the adjusted grammar; error: " + e.toString());
