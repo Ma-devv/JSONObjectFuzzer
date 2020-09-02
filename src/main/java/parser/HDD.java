@@ -71,18 +71,18 @@ public class HDD {
 							}
 							continue;
 						}
-						System.out.printf("Looped path: %s\n", looped_path.toString());
+						// System.out.printf("Looped path: %s\n", looped_path.toString());
 						// Check if current and received path/tree are the same
 						ParseTree subtree = pss.getHdd_tree().getParseTreeForPath(looped_path, 0);
 						// Create a copy of the pss so that we are also able to undo the changes
 						ParsedStringSettings saved_pss = new ParsedStringSettings(pss);
 						ParseTree saved_biggest_node = new ParseTree(biggest_node);
 //						System.out.println("Saved biggest pss:\n" + saved_pss.getTree().tree_to_string());
-						System.out.printf("Tree that should replace the biggest node:\n%s\n", subtree.tree_to_string());
+						// System.out.printf("Tree that should replace the biggest node:\n%s\n", subtree.tree_to_string());
 						// pss.getTree().replaceTreeNode(biggest_node, stree.getPt(), log);
 						pss.getHdd_tree().replaceTreeNodeUsingPath(subtree, curr_path, 0);
-						System.out.println("Saved biggest pss:\n" + saved_pss.getHdd_tree().tree_to_string());
-						System.out.println("New Tree representing the string " + pss.getHdd_tree().getTerminals() + ":\n" + pss.getHdd_tree().tree_to_string());
+						// System.out.println("Saved biggest pss:\n" + saved_pss.getHdd_tree().tree_to_string());
+						// System.out.println("New Tree representing the string " + pss.getHdd_tree().getTerminals() + ":\n" + pss.getHdd_tree().tree_to_string());
 						// Check if the subtree has at least one terminal character outside of <anychars> block and is not empty or equals a space character
 						if(checkIfAtLeastOneNonAnychar(pss.getHdd_tree(), excludeSet, log) && 
 								(!(pss.getHdd_tree().getTerminals().equals("") || 
@@ -133,7 +133,7 @@ public class HDD {
 					for(int i = 0; i < biggest_node.children.size(); i++) {
 						ParseTree stree = biggest_node.children.get(i);
 						if(stree.is_nt() && !excludeSet.contains(stree.name)) { // Not interested in terminals and in <anychar> blocks
-							System.out.println("Added Subtree " +stree.name + " to the queue");
+//							System.out.println("Added Subtree " +stree.name + " to the queue");
 							ArrayList<Integer> tmp_path = new ArrayList<Integer>();
 							tmp_path.addAll(curr_path);
 							tmp_path.add(i);

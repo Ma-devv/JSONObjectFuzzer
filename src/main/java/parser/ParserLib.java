@@ -710,16 +710,6 @@ class ParseTree{
 		return s;
 	}
 
-	public ParseTree prune_tree_helper(ParseTree pt_copy, EarleyParser ep) {
-		for(ParseTree p : pt_copy.children) {
-			ArrayList<ParseTree> tmp = new ArrayList<ParseTree>();
-			tmp.add(ep.prune_tree(p));
-			System.out.printf("Added:\n%s\nto the list of childrens:\n%s\n", tmp.get(tmp.size()-1), tmp.toString());
-			this.children = tmp;
-		}
-		return this;
-	}
-	
 	public List<Object> tree_to_string_any(ParseTree pt) {
 		if(pt.name.contains("any")) {
 			String s = pt.tree_to_string_prune();
@@ -846,7 +836,7 @@ class ParseTree{
 
 	public List<Object> removeTreesNotRepresentedByGivenArray(List<Integer> result, int deleted) {
 		try {
-			System.out.printf("%s: %s, keep numbers: %s\n", this.name, this.representing_char, result);
+//			System.out.printf("%s: %s, keep numbers: %s\n", this.name, this.representing_char, result);
 			boolean delete_child = false;
 			if(this.representing_char.size() == 1) { // Tree is only representing one character; should always be the case due to the structure of anychar
 				if(!result.contains(this.representing_char.get(0))) { // If the character that is being represented by this tree
@@ -879,13 +869,13 @@ class ParseTree{
 			}
 			if(delete_child) {
 				if(child_pos_to_delete.size() == this.children.size()) { // If all childrens have to be deleted, just replace the the childrens with an empty list
-					System.out.printf("Delete all childrens for %s\n", this.name);
+//					System.out.printf("Delete all childrens for %s\n", this.name);
 					this.children = new ArrayList<ParseTree>();
 				} else { // Otherwise first "delete" the child, then rearrange the ParseTrees within the children list
 					obj.set(0, false); // If there are childrens left in this node, do not delete the whole node
-					System.out.printf("Set delete to false for this tree");
+//					System.out.printf("Set delete to false for this tree");
 					for(int pos : child_pos_to_delete) {
-						System.out.printf("Delete child %d:\n%s\n", pos, this.children.get(pos));
+//						System.out.printf("Delete child %d:\n%s\n", pos, this.children.get(pos));
 						this.children.remove(pos);
 					}
 					/*
@@ -910,6 +900,34 @@ class ParseTree{
 			return null;
 		}
 		
+	}
+
+	// Checks if the given symbol is within the tree
+	// If so, return true
+	// Otherwise return false
+	public boolean treeContainsSymbol(String symbol) {
+		if(this.name.equals(symbol)) {
+			return true;
+		}
+		for(ParseTree pt : this.children) {
+			if(pt.treeContainsSymbol(symbol)) { // Otherwise this could be overridden by the next child in the tree
+				return true;
+			}
+		}
+		return false;
+	}
+	
+	public String getAbstractedString(String s) {
+		if(this.abstracted) {
+			return s+= String.format("%s", this.name);
+		}
+		if(!this.is_nt()) {
+			return s+= this.name;
+		}
+		for(ParseTree pt : this.children) {
+			s += pt.getAbstractedString("");
+		}
+		return s;
 	}
 	
 }
@@ -1440,39 +1458,6 @@ class EarleyParser extends Parser {
             for p in zip(*ptrees):
                 yield (name, p)
 */
-	public ParseTree prune_tree(ParseTree pt) {
-		String name = pt.name;
-		ArrayList<ParseTree> children = pt.children;
-		System.out.printf("Parsetree:\n%s\n", pt.tree_to_string_line());
-		if(name == "<>") {
-			assert pt.children.size() == 1;
-			System.out.printf("return children0:\n%s\n", children.get(0).tree_to_string_line());
-			return this.prune_tree(pt.children.get(0));
-		}
-		if(this.coalesce_tokens) {
-			pt.children = this.coalesce(pt.children);
-			System.out.printf("children:\n%s\n", pt.children.toString());
-		}
-		if(this.tokens.contains(pt.name)) {
-			StringBuilder sb = new StringBuilder(pt.tree_to_string_prune());
-			ArrayList<ParseTree> new_child = new ArrayList<ParseTree>();
-			for(int x = 0; x < sb.length(); x++) {
-				new_child.add(new ParseTree(Character.toString(sb.charAt(x)), new ArrayList<ParseTree>()));
-			}
-			System.out.printf("set new Parsetree childs:\n%s\n", new_child.toString());
-			pt.children = new_child;
-			return pt;
-		} else {
-			// System.out.printf("copy tree after:\n%s\npt tree after:\n%s\n", copy.toString(), pt.toString());
-			ParseTree copy = new ParseTree(pt);
-			return pt.prune_tree_helper(copy, this);
-//			System.out.printf("Vor Tree: %s\n", pt.tree_to_string());
-			// pt = copy;
-			// System.out.printf("Nach Tree: %s\n", pt.tree_to_string());
-			// return pt;
-		}
-	}
-	
 
 	
 	private ArrayList<ParseTree> coalesce(ArrayList<ParseTree> children) {
@@ -1677,10 +1662,10 @@ class LazyExtractor{
 			ler = extract_a_node(this.my_forest, seen, this.choices, null);
 			if(ler.getParsetree() != null) {
 				counter++;
-				if(counter % 200 == 0) {
-					// System.out.printf("Tree[%d]:\n%s\n", counter, ler.getParsetree().tree_to_string());
-					System.out.printf("Tree[%d]:\n", counter);
-				}
+//				if(counter % 200 == 0) {
+//					// System.out.printf("Tree[%d]:\n%s\n", counter, ler.getParsetree().tree_to_string());
+//					System.out.printf("Tree[%d]:\n", counter);
+//				}
 //				 System.out.printf("Tree[%d]:\n%s\n", counter, ler.getParsetree().tree_to_string());
 			}
 			// ChoiceNode c = ler.getChoicenode();

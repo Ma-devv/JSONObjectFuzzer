@@ -69,22 +69,21 @@ public class Fuzzer {
 	private HashMap<String, ArrayList<ParseTree>> dd_random_trees = new HashMap<String, ArrayList<ParseTree>>();
 	private HashSet<ParseTree> dd_random_trees_set_check = new HashSet<ParseTree>();
 	
-	private boolean log = true;
-	private final int MAX_INPUT_LENGTH = 30; // Sets the maximal input length when creating a string
+	private boolean log = false;
+	private final int MAX_INPUT_LENGTH = 100; // Sets the maximal input length when creating a string
 	private HashSet<String> exclude_grammars = new HashSet<>(Arrays.asList("<anychar>", "<anychars>", "<anycharsp>", "<anycharp>"));
 	
 	
 	// TODO 
 	/* - change printable to all characters
 	 * - adjust the simpleddset similar to hdd and check the simpleddset
-	 * - check integration of DD
-	 * 		- extend DD such that the correct part of the tree gets removed (needed for simpleDDSET)
-	 * - maybe i should declare a few methods as static 
+	 * - maybe i should declare a few methods as static
+	 * - problem wiht <elements> when using random tree generation 
 	 * */
 	public static void main(String[] args) {
 		Fuzzer fuzzer = new Fuzzer("", 0, null, args[0], null); // Create new Fuzzer; initialize grammar
 		try {
-			fuzzer.create_valid_strings(1, fuzzer.log); // Create 20 valid strings; no log level enabled
+			fuzzer.create_valid_strings(4, fuzzer.log); // Create 20 valid strings; no log level enabled
 			// Print out the strings that have been found
 			for(Map.Entry<String, ArrayList<String>> entry : fuzzer.getValid_strings().entrySet()) {
 				String key = entry.getKey();
@@ -124,12 +123,14 @@ public class Fuzzer {
 		 * */
 		int i = 0;
 		// JSONArray jsonarray = new JSONArray();
+		Date start_program = new Date();
 		while (true) {
+			Date start_iteration = new Date();
 			initializeGoldenGrammar();
 			String created_string = generate(log_level); // Generate a new valid JSON Object, according to org.json.JSONObject
 			if(created_string != null) {
 				// Check if the created string is also valid according to the "golden grammar"
-				created_string = "[599Dti5Mjo4~1x%sZp]";
+//				created_string = "{ea 92HPPf&c.:$PL}";
 //				created_string = "12 + a2";
 //	        	Fuzzer.parseStringUsingLazyExtractor(created_string, this.getCurr_ep(), 2000);
 		        if(checkIfStringCanBeParsedWithGivenGrammar(this.getCurr_ep(), created_string)) {
@@ -142,10 +143,16 @@ public class Fuzzer {
 		        	i++;
 		        	System.out.println("Created string [" + (i) + "]: " + created_string);
 		        	change_everything_except_anychar_one_after_another(created_string);
+		        	Date end_iteration = new Date();
+		        	long difference_iteration = end_iteration.getTime() - start_iteration.getTime();
+		        	System.out.printf("Time that was needed for the processing of %s: %ds\n", created_string, difference_iteration / 1000);
 		        	// jsonarray.put(created_string);
 		        	// System.out.println("\n");
 		        }
 				if(i >= n) { // Did we create enough valid strings?
+					Date end_program = new Date();
+					long difference_iteration = end_program.getTime() - start_program.getTime();
+		        	System.out.printf("Time that was needed for the program to run: %ds\n", difference_iteration / 1000);
 					break;
 				}
 			}
@@ -153,17 +160,13 @@ public class Fuzzer {
 		// System.out.printf("%s", jsonarray);
 		// System.exit(0);
 		// Simple DDSET
-		SimpleDDSET sddset = new SimpleDDSET();
-		for(Map.Entry<String, ArrayList<ParseTree>> entry : dd_random_trees.entrySet()) {
-			System.out.printf("\nState: %s, Amount of trees for randomness: %d\n", entry.getKey(), entry.getValue().size());
-		}
-		
-		
-   		// Sort the list
-		Collections.sort(this.getListForEasiestMod(), new ParsedStringSettingsComparator());
-		for(ParsedStringSettings pss : this.getListForEasiestMod()) {
-			sddset.abstractTree(pss, getExclude_grammars(), this.getGolden_grammar_EP());
-		}
+//		SimpleDDSET sddset = new SimpleDDSET();		
+//		
+//   		// Sort the list
+//		Collections.sort(this.getListForEasiestMod(), new ParsedStringSettingsComparator());
+//		for(ParsedStringSettings pss : this.getListForEasiestMod()) {
+//			sddset.abstractTree(pss, getExclude_grammars(), this.getGolden_grammar_EP());
+//		}
 	}
 	
 	public static boolean checkIfStringCanBeParsedWithGivenGrammar(EarleyParser ep, String input_string) {
@@ -200,9 +203,7 @@ public class Fuzzer {
     	for(Map.Entry<String, GDef> entry : master.entrySet()) { //
     		counter++;
     		String state = entry.getKey().toString();
-    		if(this.log) {
-    			System.out.println("\n\n----STATE " + counter + "/" + master.size() + ": " + state + "----");
-    		}
+    		System.out.println("\n\n----STATE " + counter + "/" + master.size() + ": " + state + "----");
     		
     		if(this.getExclude_grammars().contains(state)) {
     			if(this.log) {
@@ -233,9 +234,11 @@ public class Fuzzer {
                 	            hdd.startHDD(pss, this.getExclude_grammars(), this.getGolden_grammar_PL(), this.getGolden_grammar_EP(), this.log);
                 	            MinimizeAnychar ma = new MinimizeAnychar();
                 	            ma.startDD(pss, getGolden_grammar_EP(), getGolden_grammar_PL(), this.getCurr_ep());
-                	            addMinimalInputToList(pss);
                 	            SimpleDDSET sddset = new SimpleDDSET();
                 	            sddset.abstractTree(pss, getExclude_grammars(), this.getGolden_grammar_EP());
+                	            if(pss.getAbstracted_string().contains("<") && pss.getAbstracted_string().contains(">")) { // Was the abstraction successful?
+                	            	addMinimalInputToList(pss);
+                	            }
                     		}
                     		else {
                     			if(this.log) {
@@ -245,9 +248,7 @@ public class Fuzzer {
                 			
                 		}
     				} catch (Exception e) {
-    					if(this.log) {
-    						System.out.println("change_everything_except_anychar_one_after_another: " + e.toString());
-    					}
+    					System.out.println("change_everything_except_anychar_one_after_another: " + e.toString());
     					
     				}
 				}
@@ -269,10 +270,14 @@ public class Fuzzer {
         			ParsedStringSettings pss = createPssForBestTree(best_tree, sorted_pos_length_lst, created_string, state, master, -1, -1, entry, anycharsp);
         			if(pss != null) {
         	            HDD hdd = new HDD();
-        	            hdd.startHDD(pss, this.getExclude_grammars(), this.getGolden_grammar_PL(), this.getGolden_grammar_EP(), true);
+        	            hdd.startHDD(pss, this.getExclude_grammars(), this.getGolden_grammar_PL(), this.getGolden_grammar_EP(), this.log);
         	            MinimizeAnychar ma = new MinimizeAnychar();
-        	            ma.startDD(pss, getGolden_grammar_EP(), getGolden_grammar_PL(), this.getCurr_ep());
-        	            addMinimalInputToList(pss);        	            
+        	            ma.startDD(pss, getGolden_grammar_EP(), getGolden_grammar_PL(), this.getCurr_ep()); 	
+        	            SimpleDDSET sddset = new SimpleDDSET();
+        	            sddset.abstractTree(pss, getExclude_grammars(), this.getGolden_grammar_EP());
+        	            if(pss.getAbstracted_string().contains("<") && pss.getAbstracted_string().contains(">")) { // Was the abstraction successful?
+        	            	addMinimalInputToList(pss);
+        	            }
             		}
              		else {
             			if(this.log) {
@@ -288,10 +293,25 @@ public class Fuzzer {
     	if(true) {
     		System.out.println("\n\nDone with adjusting the grammar for " + created_string + "\n\n");
 		}
+    	for(ParsedStringSettings pss : this.getListForEasiestMod()) {
+            System.out.printf(""
+            		+ "ID: %d\n"
+            		+ "Generated string: %s\n"
+            		+ "HDD string: %s\n"
+            		+ "DD string: %s\n"
+            		+ "Abstracted string: %s\n", 
+            		pss.hashCode(),
+            		pss.getCreated_string(),
+            		pss.getHdd_string(),
+            		pss.getDd_string(),
+            		pss.getAbstracted_tree().getAbstractedString("")
+            		);
+    	}
+//    	System.exit(0);
 	}
 	
 	private ParsedStringSettings createPssForBestTree(ParseTree pt, TreeMap<Integer, Integer> sorted_pos_length_lst, String created_string, String state, HashMap<String, GDef> master, int gRuleC, int elemC, Entry<String, GDef> entry, GRule anycharsp) {
-		System.out.printf("Original string: %s\tLength %d\n", created_string, created_string.length());
+//		System.out.printf("Original string: %s\tLength %d\n", created_string, created_string.length());
 		StringBuilder sb_created_string = new StringBuilder(created_string);
 		int anychars_length;
 		int pos;
@@ -330,6 +350,7 @@ public class Fuzzer {
             		sb_created_string.toString(),
             		"",
             		"",
+            		"",
             		pt.count_nodes(0, this.getExclude_grammars()),
             		pt.count_leafes(),
             		state, 
@@ -346,6 +367,7 @@ public class Fuzzer {
 			return new ParsedStringSettings(
 	            		created_string,
 	            		sb_created_string.toString(),
+	            		"",
 	            		"",
 	            		"",
 	            		pt.count_nodes(0, this.getExclude_grammars()),
@@ -511,7 +533,7 @@ public class Fuzzer {
 			}
 			// System.exit(0);
 			if(log_level) {
-				System.out.format("%s n=%d, c=%s. Input string was %s", rv, n, c, getCurrent_str());
+				System.out.format("%s n=%d, c=%s. Input string was %s\n", rv, n, c, getCurrent_str());
 			}
 			if(getRv().equals(complete)) { // Return if complete
 				return getCurrent_str();
@@ -535,7 +557,7 @@ public class Fuzzer {
 				continue;
 			}
 			else {
-				System.out.println("ERROR What is this I dont know !!!");
+				System.out.println("ERROR");
 				break;
 			}
 		}
@@ -757,8 +779,8 @@ public class Fuzzer {
 		 * (depending on which printable is used)
 		 * */
 		ArrayList<Character> tmp_char_set = new ArrayList<Character>();
-		// char[] set_of_chars = printable_with_special_characters();
-		char[] set_of_chars = printable();
+		char[] set_of_chars = printable_with_special_characters();
+		// char[] set_of_chars = printable();
 		for(char c : set_of_chars) {
 			tmp_char_set.add(c);
 		}

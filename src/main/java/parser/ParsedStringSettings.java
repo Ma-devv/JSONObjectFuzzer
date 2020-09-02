@@ -5,6 +5,7 @@ public class ParsedStringSettings {
 	private String string_after_removing_anychars;
 	private String hdd_string;
 	private String dd_string;
+	private String abstracted_string;
 	private int tree_size;
 	private int leaf_size;
 	private String changed_rule;
@@ -22,6 +23,7 @@ public class ParsedStringSettings {
 			String string_after_removing_anychars,
 			String hdd_string,
 			String dd_string,
+			String abstracted_string,
 			int tree_size,
 			int leaf_size,
 			String changed_rule, 
@@ -38,6 +40,7 @@ public class ParsedStringSettings {
 		this.string_after_removing_anychars = string_after_removing_anychars;
 		this.hdd_string = hdd_string;
 		this.dd_string = dd_string;
+		this.abstracted_string = abstracted_string;
 		this.tree_size = tree_size;
 		this.leaf_size = leaf_size;
 		this.changed_rule = changed_rule;
@@ -59,6 +62,7 @@ public class ParsedStringSettings {
 		this.string_after_removing_anychars = source.string_after_removing_anychars;
 		this.hdd_string = source.hdd_string;
 		this.dd_string = source.dd_string;
+		this.abstracted_string = source.abstracted_string;
 		this.tree_size = source.tree_size;
 		this.leaf_size = source.leaf_size;
 		this.changed_rule = source.changed_rule;
@@ -170,6 +174,12 @@ public class ParsedStringSettings {
 	public void setAbstracted_tree(ParseTree abstracted_tree) {
 		this.abstracted_tree = abstracted_tree;
 	}
+	public String getAbstracted_string() {
+		return abstracted_string;
+	}
+	public void setAbstracted_string(String abstracted_string) {
+		this.abstracted_string = abstracted_string;
+	}
 
 	@Override
 	public String toString() {
@@ -182,6 +192,7 @@ public class ParsedStringSettings {
 				+ "String after removing characters represented using <anychar>: %s\n"
 				+ "Minimized string using HDD: %s\n"
 				+ "String after minimizing using DD: %s\n"
+				+ "Abstracted string: %s\n"
 				+ "Adjusted rule: %s\n"
 				+ "Adjusted token: %s\n"
 				+ "Adjusted element: %s\n"
@@ -197,6 +208,7 @@ public class ParsedStringSettings {
 				ras, // String after removing <anychar> parts
 				this.getHdd_string(), // Minimized string using hdd
 				this.getDd_string(),
+				this.getAbstracted_string(),
 				this.getChanged_rule(), // Adjusted rule 
 				this.getChanged_token(), // Adjusted Token 
 				this.getChanged_elem(), // Adjusted Element
