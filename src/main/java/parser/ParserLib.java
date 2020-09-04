@@ -930,6 +930,32 @@ class ParseTree{
 		return s;
 	}
 	
+	public String getOutputFormatAsJSON(HashSet<String> exclude_grammars) {
+		String s = String.format("{'%s' : [<anychar %s>]}", this.getTerminalsFromNonAnychar("", exclude_grammars), this.getTerminalsFromAnychar("", exclude_grammars, this));
+		return s;
+	}
+	
+	public String getTerminalsFromNonAnychar(String s, HashSet<String> exclude_grammars) {
+		if(!this.is_nt()) { // If terminal, return name
+			return this.name;
+		}
+		for(ParseTree pt : this.children) {
+			if(!exclude_grammars.contains(pt)) { // Only non anychar terminals
+				s += pt.getTerminalsFromNonAnychar("", exclude_grammars);
+			}
+		}
+		return s;
+	}
+	
+	public String getTerminalsFromAnychar(String s, HashSet<String> exclude_grammars, ParseTree parent) {
+		if(!this.is_nt() && exclude_grammars.contains(parent.name)) { // If terminal and parent is anychar block, return terminal
+			return this.name;
+		}
+		for(ParseTree pt : this.children) {
+			s += pt.getTerminalsFromAnychar("", exclude_grammars, this);
+		}
+		return s;
+	}
 }
 
 class ParseForest implements Iterable<ParseTree> {
@@ -1662,10 +1688,10 @@ class LazyExtractor{
 			ler = extract_a_node(this.my_forest, seen, this.choices, null);
 			if(ler.getParsetree() != null) {
 				counter++;
-				if(counter % 20 == 0) {
-					// System.out.printf("Tree[%d]:\n%s\n", counter, ler.getParsetree().tree_to_string());
-					System.out.printf("Tree[%d]:\n", counter);
-				}
+//				if(counter % 20 == 0) {
+//					// System.out.printf("Tree[%d]:\n%s\n", counter, ler.getParsetree().tree_to_string());
+//					System.out.printf("Tree[%d]:\n", counter);
+//				}
 //				 System.out.printf("Tree[%d]:\n%s\n", counter, ler.getParsetree().tree_to_string());
 			}
 			// ChoiceNode c = ler.getChoicenode();

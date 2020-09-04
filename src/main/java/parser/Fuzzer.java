@@ -1,4 +1,12 @@
 package parser;
+import java.io.ByteArrayOutputStream;
+import java.io.ObjectOutputStream;
+import java.sql.Connection;
+import java.sql.DatabaseMetaData;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.Statement;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -76,29 +84,67 @@ public class Fuzzer {
 	
 	
 	// TODO 
-	/* - change printable to all characters
-	 * - adjust the simpleddset similar to hdd and check the simpleddset
+	/* 
 	 * - maybe i should declare a few methods as static
-	 * - problem wiht <elements> when using random tree generation 
+	 * - problem with <elements> when using random tree generation 
 	 * */
 	public static void main(String[] args) {
 		Fuzzer fuzzer = new Fuzzer("", 0, null, args[0], null); // Create new Fuzzer; initialize grammar
+		fuzzer.initializeGoldenGrammar();
 		try {
-			fuzzer.create_valid_strings(4, fuzzer.log); // Create 20 valid strings; no log level enabled
-			// Print out the strings that have been found
-			for(Map.Entry<String, ArrayList<String>> entry : fuzzer.getValid_strings().entrySet()) {
-				String key = entry.getKey();
-				ArrayList<String> value = entry.getValue();
-				System.out.println("Found " + value.size() + " inputs for the exception " + key);
-				for(String s : value) {
-					System.out.println("Valid String: " + s + "\n");
-				}
+			String url = args[2];
+			if(args[1].equals("Fuzzing")) { // Do we want to generate strings?
+				/* Credits for DB creation:
+				 * https://www.javatpoint.com/java-sqlite
+				 * */
+				createDB(url);
+				createTable(url);
+				Connection con = connect(url);
+				fuzzer.create_valid_strings(100, fuzzer.log, con); // Create 20 valid strings; no log level enabled
+			} else { // Or do we want to analyze them?
+				Connection con = connect(url);
+				analysis(fuzzer, con, 0, 1000000, url);
 			}
 		} catch (Exception e) {
 			System.out.println("Something went wrong...\nError: " + e);
 			System.exit(1);
 		}
 		
+	}
+
+	private static void analysis(Fuzzer fuzzer, Connection con, int analyse_from, int analyse_to, String url) {
+		try {
+			ResultSet rs = selectAllInputStrings(con);
+			while(rs.next()) {
+				int id = rs.getInt("id");
+				if(id >= analyse_from && id < analyse_to) { // Exclude analyse_to
+					String created_string = rs.getString("generated_string");
+					System.out.printf("Processing string [id: %d]: %s\n", id, created_string);
+					Date start_iteration = new Date();
+					fuzzer.change_everything_except_anychar_one_after_another(created_string, con, id);
+		        	Date end_iteration = new Date();
+		        	long difference_iteration = end_iteration.getTime() - start_iteration.getTime();
+		        	System.out.printf("Time that was needed for the processing of %s: %ds\n", created_string, difference_iteration / 1000);
+				}
+			}
+		} catch (Exception e) {
+			System.out.printf("Error during analysis: %s\nExit program", e.toString());
+			System.exit(1);
+		}
+		
+	}
+
+	private static ResultSet selectAllInputStrings(Connection con) {
+		String sql_select_all = "SELECT * FROM input_strings";
+		ResultSet rs = null;
+		try {
+			Statement stmt = con.createStatement();
+			rs = stmt.executeQuery(sql_select_all);
+		} catch (Exception e) {
+			System.out.printf("Error when selecting all strings: %s\nExit program", e.toString());
+			System.exit(1);
+		}
+		return rs;
 	}
 
 	// Constructor
@@ -115,7 +161,7 @@ public class Fuzzer {
 			this.special_char.add(i);
 		}
 	}
-	public void create_valid_strings(int n, boolean log_level) {
+	public void create_valid_strings(int n, boolean log_level, Connection con) {
 		/* 
 		 * Creates n strings that are valid JSON according to 
 		 * org.json.JSONObject but are rejected by the golden
@@ -125,9 +171,10 @@ public class Fuzzer {
 		int i = 0;
 		// JSONArray jsonarray = new JSONArray();
 		Date start_program = new Date();
+		HashSet<String> input_strings = new HashSet<String>();
 		while (true) {
-			Date start_iteration = new Date();
-			initializeGoldenGrammar();
+			// Date start_iteration = new Date();
+			// initializeGoldenGrammar();
 			String created_string = generate(log_level); // Generate a new valid JSON Object, according to org.json.JSONObject
 			if(created_string != null) {
 				// Check if the created string is also valid according to the "golden grammar"
@@ -143,10 +190,17 @@ public class Fuzzer {
 		            // Change the golden grammar until the string can be parsed
 		        	i++;
 		        	System.out.println("Created string [" + (i) + "]: " + created_string);
+		        	if(!input_strings.contains(created_string)) {
+		        		input_strings.add(created_string);
+		        		insertToDB(con, created_string);
+		        	}
+		        	/*
 		        	change_everything_except_anychar_one_after_another(created_string);
 		        	Date end_iteration = new Date();
 		        	long difference_iteration = end_iteration.getTime() - start_iteration.getTime();
 		        	System.out.printf("Time that was needed for the processing of %s: %ds\n", created_string, difference_iteration / 1000);
+		        	*/
+		        	
 		        	// jsonarray.put(created_string);
 		        	// System.out.println("\n");
 		        }
@@ -170,6 +224,66 @@ public class Fuzzer {
 //		}
 	}
 	
+	private void insertToDB(Connection con, String created_string) {
+		String sql_insert = "INSERT INTO input_strings(generated_string) VALUES(?)";
+		try {
+			PreparedStatement pstmt = con.prepareStatement(sql_insert);
+			pstmt.setString(1, created_string);
+			pstmt.executeUpdate();
+		} catch (Exception e) {
+			System.out.printf("Error when inserting the string: %s: %s\nExit program", created_string, e.toString());
+			System.exit(1);
+		}
+		
+	}
+
+	private static Connection connect(String url) {
+		Connection con = null;
+		try {
+			con = DriverManager.getConnection(url);
+		} catch (Exception e) {
+			System.out.printf("Error when connection to DB: %s\nExit program", e.toString());
+			System.exit(1);
+		}
+		return con;
+	}
+
+	private static void createTable(String url) {
+		String sql_create_table = "CREATE TABLE IF NOT EXISTS input_strings"
+				+ "("
+				+ "id integer PRIMARY KEY, "
+				+ "generated_string text NOT NULL, "
+				+ "output text, " // In JSON, like discussed
+				+ "changed_rule text, "
+				+ "changed_token text, "
+				+ "changed_element text "
+				+ ");";
+		try {
+			Connection con = DriverManager.getConnection(url);
+			Statement stmt = con.createStatement();
+			stmt.execute(sql_create_table);
+		} catch (Exception e) {
+			System.out.printf("Error when creating the table: %s\nExit program", e.toString());
+			System.exit(1);
+		}
+		
+	}
+
+	public static void createDB(String url) {
+		Connection con = null;
+		try {
+			con = DriverManager.getConnection(url);
+			if(con != null) {
+				DatabaseMetaData meta = con.getMetaData();
+				System.out.printf("Successful created new DB.\nDriver name: %s\n", meta.getDriverName());
+			}
+		} catch (Exception e) {
+			System.out.printf("%s\nProgram ended", e.toString());
+			System.exit(1);
+		}
+		
+	}
+
 	public static boolean checkIfStringCanBeParsedWithGivenGrammar(EarleyParser ep, String input_string) {
 		// Checks if the given string can be parsed with the given grammar of the EarleyParser
 		try {
@@ -195,7 +309,7 @@ public class Fuzzer {
 		}
 	}
 
-	private void change_everything_except_anychar_one_after_another(String created_string) {
+	private void change_everything_except_anychar_one_after_another(String created_string, Connection con, int id) {
 		/*
     	 * For every rule within the grammar, loop over the entries within the rule and replace each non terminal one at a time
     	 */
@@ -238,6 +352,7 @@ public class Fuzzer {
                 	            ma.startDD(pss, getGolden_grammar_EP(), getGolden_grammar_PL(), this.getCurr_ep());
                 	            SimpleDDSET sddset = new SimpleDDSET();
                 	            sddset.abstractTree(pss, getExclude_grammars(), this.getGolden_grammar_EP());
+                	            updateDB(con, pss, id);
                 	            if(pss.getAbstracted_string().contains("<") && pss.getAbstracted_string().contains(">")) { // Was the abstraction successful?
                 	            	addMinimalInputToList(pss);
                 	            }
@@ -277,21 +392,12 @@ public class Fuzzer {
         	            ma.startDD(pss, getGolden_grammar_EP(), getGolden_grammar_PL(), this.getCurr_ep()); 	
         	            SimpleDDSET sddset = new SimpleDDSET();
         	            sddset.abstractTree(pss, getExclude_grammars(), this.getGolden_grammar_EP());
-//        	            System.out.printf(""
-//        	            		+ "ID: %d\n"
-//        	            		+ "Generated string: %s\n"
-//        	            		+ "HDD string: %s\n"
-//        	            		+ "DD string: %s\n"
-//        	            		+ "Abstracted string: %s\n", 
-//        	            		pss.hashCode(),
-//        	            		pss.getCreated_string(),
-//        	            		pss.getHdd_string(),
-//        	            		pss.getDd_string(),
-//        	            		pss.getAbstracted_tree().getAbstractedString("")
-//        	            		);
+        	            updateDB(con, pss, id);
         	            if(pss.getAbstracted_string().contains("<") && pss.getAbstracted_string().contains(">")) { // Was the abstraction successful?
         	            	addMinimalInputToList(pss);
-        	            }
+        	            } else {
+							
+						}
             		}
              		else {
             			if(this.log) {
@@ -313,7 +419,7 @@ public class Fuzzer {
             		+ "Generated string: %s\n"
             		+ "HDD string: %s\n"
             		+ "DD string: %s\n"
-            		+ "Abstracted string: %s\n", 
+            		+ "Abstracted string: %s\n\n", 
             		pss.hashCode(),
             		pss.getCreated_string(),
             		pss.getHdd_string(),
@@ -324,6 +430,57 @@ public class Fuzzer {
 //    	System.exit(0);
 	}
 	
+	private void updateDB(Connection con, ParsedStringSettings pss, int id) {
+		 String sql_update = "UPDATE input_strings "
+					+ "SET output = ?, "
+					+ "changed_rule = ?, "
+					+ "changed_token = ?, "
+					+ "changed_element = ? "
+					+ "WHERE id = ?";
+		try {
+			// Connection c = connect(url);
+			PreparedStatement pstmt = con.prepareStatement(sql_update);
+			String output = pss.getAbstracted_tree() == null ? "" : pss.getAbstracted_tree().getOutputFormatAsJSON(this.exclude_grammars);
+			pstmt.setString(1, output);
+			pstmt.setString(2, pss.getChanged_rule());
+			pstmt.setString(3, pss.getChanged_token().toString());
+			pstmt.setString(4, pss.getChanged_elem());
+			pstmt.setInt(5, id);
+			pstmt.executeUpdate();
+			printUpdate(con, id);
+			System.out.printf("Updated successful\n");
+		} catch (Exception e) {
+			System.out.printf("Error during updateDB for string %s: %s\n", pss.getCreated_string(), e.toString());
+		}
+		
+	}
+
+	private void printUpdate(Connection con, int id) {
+		String sql_select_row = "SELECT * FROM input_strings WHERE input_strings.ID = ?";
+		try {
+			PreparedStatement pstmt = con.prepareStatement(sql_select_row);
+			pstmt.setInt(1, id);
+			ResultSet rs = pstmt.executeQuery();
+			while(rs.next()) {
+				System.out.printf("ID: %d\n"
+						+ "Created String: %s\n"
+						+ "Output: %s\n"
+						+ "Changed rule: %s\n"
+						+ "Changed token: %s\n"
+						+ "Changed element: %s\n", 
+						rs.getInt("id"),
+						rs.getString("generated_string"),
+						rs.getString("output"),
+						rs.getString("changed_rule"),
+						rs.getString("changed_token"),
+						rs.getString("changed_element"));
+			}
+		} catch (Exception e) {
+			System.out.printf("Error during printUpdate: %s\n", e.toString());
+		}
+		
+	}
+
 	private ParsedStringSettings createPssForBestTree(ParseTree pt, TreeMap<Integer, Integer> sorted_pos_length_lst, String created_string, String state, HashMap<String, GDef> master, int gRuleC, int elemC, Entry<String, GDef> entry, GRule anycharsp) {
 //		System.out.printf("Original string: %s\tLength %d\n", created_string, created_string.length());
 		StringBuilder sb_created_string = new StringBuilder(created_string);
@@ -811,9 +968,9 @@ public class Fuzzer {
 		 * from get_next_char
 		 * */
 		ArrayList<Character> set_of_chars = getChar_set();
-		int idx = ThreadLocalRandom.current().nextInt(0, set_of_chars.size()); // Get a random character between 0 and the size of the set
-		// Random rand = new Random();
-		// int idx = rand.nextInt(set_of_chars.size());
+		// int idx = ThreadLocalRandom.current().nextInt(0, set_of_chars.size()); // Get a random character between 0 and the size of the set
+		Random rand = new Random();
+		int idx = rand.nextInt(set_of_chars.size());
 		char input_char = set_of_chars.get(idx); // Set the return value to the character
 		getChar_set().remove(idx); // And remove the character from the list
 		if(log_level) {
