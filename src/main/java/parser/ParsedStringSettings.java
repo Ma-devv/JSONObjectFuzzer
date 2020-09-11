@@ -1,6 +1,15 @@
 package parser;
 
-public class ParsedStringSettings {
+import java.io.Serializable;
+
+public class ParsedStringSettings implements Serializable{
+	/**
+	 * 
+	 */
+	private static final long serialVersionUID = 8478341532937662557L;
+	/**
+	 * 
+	 */
 	private String created_string;
 	private String string_after_removing_anychars;
 	private String hdd_string;

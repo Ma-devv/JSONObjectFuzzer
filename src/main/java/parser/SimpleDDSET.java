@@ -47,56 +47,50 @@ public class SimpleDDSET {
 
 	private boolean can_abstract(ParseTree main_tree, ParseTree biggest_node, ArrayList<Integer> path, EarleyParser earleyParserGG) {
 		int i = 0;
-		try {
-			while(i < MAX_TRIES_FOR_ABSTRACTION) {
-				// Save the main/original tree
-				ParseTree main_tree_copy = new ParseTree(main_tree);
+		while(i < MAX_TRIES_FOR_ABSTRACTION) {
+			// Save the main/original tree
+			ParseTree main_tree_copy = new ParseTree(main_tree);
 //				System.out.println("Created a copy for main tree:\n" + main_tree.tree_to_string());
-				replace_all_paths_with_generated_values(main_tree_copy, new ArrayList<Integer>(), earleyParserGG);
+			replace_all_paths_with_generated_values(main_tree_copy, new ArrayList<Integer>(), earleyParserGG);
 //				System.out.println("Copied main tree after <abstract> replacements:\n" + main_tree.tree_to_string());
-				// Additionally, change the tree of the node we are currently at
-				ParseTree rand_tree = create_random_tree(biggest_node.name, earleyParserGG);
+			// Additionally, change the tree of the node we are currently at
+			ParseTree rand_tree = create_random_tree(biggest_node.name, earleyParserGG);
 //				System.out.println("Received random tree\n");
-				if(rand_tree == null) {
-					return false;
-				}
-				HashMap<String, TreeMap<Integer, ArrayList<ArrayList<Integer>>>> lst = new HashMap<String, TreeMap<Integer,ArrayList<ArrayList<Integer>>>>();
-				rand_tree.getPathListForSymbols(new ArrayList<Integer>(), 0, lst);
-				if(!lst.containsKey(biggest_node.name)) {
-					return false;
-				}
+			if(rand_tree == null) {
+				return false;
+			}
+			HashMap<String, TreeMap<Integer, ArrayList<ArrayList<Integer>>>> lst = new HashMap<String, TreeMap<Integer,ArrayList<ArrayList<Integer>>>>();
+			rand_tree.getPathListForSymbols(new ArrayList<Integer>(), 0, lst);
+			if(!lst.containsKey(biggest_node.name)) {
+				return false;
+			}
 //				System.out.println("Received path list\n");
-				Outer_loop:
-				for(Entry<Integer, ArrayList<ArrayList<Integer>>> tree_map : lst.get(biggest_node.name).entrySet()) {
-					for(ArrayList<Integer> new_path : tree_map.getValue()) {
-						rand_tree = rand_tree.getParseTreeForPath(new_path, 0);
-						break Outer_loop;
-					}
+			Outer_loop:
+			for(Entry<Integer, ArrayList<ArrayList<Integer>>> tree_map : lst.get(biggest_node.name).entrySet()) {
+				for(ArrayList<Integer> new_path : tree_map.getValue()) {
+					rand_tree = rand_tree.getParseTreeForPath(new_path, 0);
+					break Outer_loop;
 				}
-				// rand_tree = rand_tree.getParseTreeForPath(path, 0);
-				if(rand_tree == null) {
-					return false;
-				}
+			}
+			// rand_tree = rand_tree.getParseTreeForPath(path, 0);
+			if(rand_tree == null) {
+				return false;
+			}
 //				System.out.printf("main_tree:\n%s\ntarget_tree:\n%s\nrand_tree:\n%s\n",
 //						main_tree.tree_to_string(),
 //						biggest_node.tree_to_string(),
 //						rand_tree.tree_to_string());
-				main_tree_copy.replaceTreeNodeUsingPath(rand_tree, path, 0);
-				
+			main_tree_copy.replaceTreeNodeUsingPath(rand_tree, path, 0);
+			
 //				System.out.println("Copied main tree after biggest node replacements:\n" + main_tree_copy.tree_to_string());
-				String merged_input = main_tree_copy.getTerminals();
-				if(!checkIfJSONPasses(merged_input) || !checkIfGGFails(earleyParserGG, merged_input)) { // If the change of the tree does not hold once
+			String merged_input = main_tree_copy.getTerminals();
+			if(!checkIfJSONPasses(merged_input) || !checkIfGGFails(earleyParserGG, merged_input)) { // If the change of the tree does not hold once
 //					System.out.println("Unable to parse the newly merged string; return false");
-					// Then the abstraction of the biggest_node failed
-					return false;
-				}
-				i++;
+				// Then the abstraction of the biggest_node failed
+				return false;
 			}
-		} catch (Exception e) {
-			System.out.printf("Error in can_abstract: %s\n", e.toString());
-			return false;
+			i++;
 		}
-		
 		// If we were able to parse the string at any time (so with each abstraction), we can mark the tree as abstracted
 //		System.out.println("Successfully abstracted the node\n" + biggest_node.tree_to_string());
 		biggest_node.setAbstracted(true);
@@ -155,36 +149,31 @@ public class SimpleDDSET {
 	}
 	private ParseTree create_random_tree(String name, EarleyParser earleyParserGG) {
 		ParseTree pt = null;
-		try {
-			LimitFuzzer lf = new LimitFuzzer(earleyParserGG.grammar);
-			ArrayList<ArrayList<String>> aas_lst = lf.fuzz(name, 1000, 30);
-			for(ArrayList<String> as : aas_lst) {
-				if(as != null) {
-					StringBuilder sb = new StringBuilder();
-					for(String s : as) {
-						sb.append(s);
+		LimitFuzzer lf = new LimitFuzzer(earleyParserGG.grammar);
+		ArrayList<ArrayList<String>> aas_lst = lf.fuzz(name, 1000, 30);
+		for(ArrayList<String> as : aas_lst) {
+			if(as != null) {
+				StringBuilder sb = new StringBuilder();
+				for(String s : as) {
+					sb.append(s);
+				}
+				List<Object> o = Fuzzer.parseStringUsingLazyExtractor(sb.toString(), earleyParserGG, 10);
+				if(o == null) {
+					continue;
+				}
+				if(pt == null) {
+					ParseTree tmp_pt = (ParseTree) o.get(0);
+					if(tmp_pt.treeContainsSymbol(name)) { // Need to check if the symbol is within the tree as for example for <elements>
+						// some values that are created for the string can be represented using <element> instead of <elements>
+						pt = tmp_pt;
 					}
-					List<Object> o = Fuzzer.parseStringUsingLazyExtractor(sb.toString(), earleyParserGG, 10);
-					if(o == null) {
-						continue;
-					}
-					if(pt == null) {
-						ParseTree tmp_pt = (ParseTree) o.get(0);
-						if(tmp_pt.treeContainsSymbol(name)) { // Need to check if the symbol is within the tree as for example for <elements>
-							// some values that are created for the string can be represented using <element> instead of <elements>
-							pt = tmp_pt;
-						}
-					} else if(sb.length() > 0 && sb.length() > pt.getTerminals().length()) {
-						ParseTree tmp_pt = (ParseTree) o.get(0);
-						if(tmp_pt.treeContainsSymbol(name)) { // Also verify if the given name is within the tree
-							pt = tmp_pt;
-						}
+				} else if(sb.length() > 0 && sb.length() > pt.getTerminals().length()) {
+					ParseTree tmp_pt = (ParseTree) o.get(0);
+					if(tmp_pt.treeContainsSymbol(name)) { // Also verify if the given name is within the tree
+						pt = tmp_pt;
 					}
 				}
 			}
-		} catch (Exception e) {
-			System.out.println("Error: create_random_tree: " + e.toString());
-			return null;
 		}
 		return pt;
 	}
@@ -196,23 +185,18 @@ public class SimpleDDSET {
 	
 	
 	private boolean checkIfJSONPasses(String terminals) {
-//		System.out.println("Try to parse the string: " + terminals);
 		if(terminals.startsWith("{")) {
 			try {
 				JSONObject obj = new JSONObject(terminals);
-//				System.out.println("Parsed successfully");
 				return true;
 			} catch (Exception e) {
-//				System.out.println("Not parsed successfully");
 				return false;
 			}
 		} else {
 			try {
 				JSONArray arr = new JSONArray(terminals);
-//				System.out.println("Parsed successfully");
 				return true;
 			} catch (Exception e) {
-//				System.out.println("Not parsed successfully");
 				return false;
 			}
 		}
@@ -225,8 +209,10 @@ public class SimpleDDSET {
 		path.add(0);
 		path.add(0);
 		ParseTree abstracted_tree = generalize(pss.getDd_tree(), path, earleyParserGG);
-		pss.setAbstracted_tree(abstracted_tree);
-		pss.setAbstracted_string(abstracted_tree.getAbstractedString(""));
+		if(abstracted_tree.getAbstractedString("").contains("<") && abstracted_tree.getAbstractedString("").contains(">")) {
+			pss.setAbstracted_tree(abstracted_tree);
+			pss.setAbstracted_string(abstracted_tree.getAbstractedString(""));
+		}
 //		System.out.println(String.format("Abstracted the tree:\n%s\n", pss.toString()));
 	}
 }

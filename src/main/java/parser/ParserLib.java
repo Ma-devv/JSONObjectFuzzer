@@ -1688,10 +1688,10 @@ class LazyExtractor{
 			ler = extract_a_node(this.my_forest, seen, this.choices, null);
 			if(ler.getParsetree() != null) {
 				counter++;
-//				if(counter % 20 == 0) {
-//					// System.out.printf("Tree[%d]:\n%s\n", counter, ler.getParsetree().tree_to_string());
-//					System.out.printf("Tree[%d]:\n", counter);
-//				}
+				if(counter % 20 == 0) {
+					// System.out.printf("Tree[%d]:\n%s\n", counter, ler.getParsetree().tree_to_string());
+					System.out.printf("Tree[%d]:\n", counter);
+				}
 //				 System.out.printf("Tree[%d]:\n%s\n", counter, ler.getParsetree().tree_to_string());
 			}
 			// ChoiceNode c = ler.getChoicenode();
