@@ -80,7 +80,7 @@ public class Fuzzer {
 	private HashSet<ParseTree> dd_random_trees_set_check = new HashSet<ParseTree>();
 	
 	private boolean log = false;
-	private final int MAX_INPUT_LENGTH = 1000; // Sets the maximal input length when creating a string
+	private final int MAX_INPUT_LENGTH = 20; // Sets the maximal input length when creating a string
 	private HashSet<String> exclude_grammars = new HashSet<>(Arrays.asList("<anychar>", "<anychars>", "<anycharsp>", "<anycharp>"));
 	
 	
@@ -93,6 +93,7 @@ public class Fuzzer {
 		Fuzzer fuzzer = new Fuzzer("", 0, null, args[0], null); // Create new Fuzzer; initialize grammar
 		try {
 			String url = returnDBPath();
+			System.out.printf("Try to connect or create db located at: %s\n", url);
 			Connection con = connect(url);
 			if(con == null) {
 				System.out.printf("No connection possible");
@@ -106,7 +107,7 @@ public class Fuzzer {
 				 * */
 				createDB(url);
 				createTable(url);
-				fuzzer.create_valid_strings(2000, fuzzer.log, con); // Create 20 valid strings; no log level enabled
+				fuzzer.create_valid_strings(2, fuzzer.log, con); // Create 20 valid strings; no log level enabled
 			} 
 			// If so, we can start with the analyzing
 			ResultSet rs = selectAllFromInputStrings(con);
