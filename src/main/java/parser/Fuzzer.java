@@ -90,7 +90,15 @@ public class Fuzzer {
 	 * - problem with <elements> when using random tree generation 
 	 * */
 	public static void main(String[] args) {
-		Fuzzer fuzzer = new Fuzzer("", 0, null, args[0], null); // Create new Fuzzer; initialize grammar
+		Fuzzer fuzzer;
+		if(args.length == 0) {
+			// Default path current directory
+			String path = getGrammarPath();
+			System.out.printf("No grammar explicitly specified. Using the default path: %s\n\n", path);
+			fuzzer = new Fuzzer("", 0, null, path, null); // Create new Fuzzer; initialize grammar
+		} else {
+			fuzzer = new Fuzzer("", 0, null, args[0], null); // Create new Fuzzer; initialize grammar
+		}
 		try {
 			String url = returnDBPath();
 			System.out.printf("Try to connect or create db located at: %s\n", url);
@@ -147,6 +155,22 @@ public class Fuzzer {
 			System.exit(1);
 		}
 		
+	}
+
+	private static String getGrammarPath() {
+		String path = Paths.get(".").toAbsolutePath().normalize().toString();
+		String grammar_file = "jsongrammar_ascii.json";
+		if(path.endsWith("/") || path.endsWith("\\")) { // Does the path end with / or \ ?
+			// If so, just append the database name
+			path += grammar_file;
+		} else {
+			if(path.contains("/")) {
+				path += "/" + grammar_file;
+			} else {
+				path += "\\" + grammar_file;
+			}
+		}
+		return path;
 	}
 
 	private static ResultSet selectAllFromProcessedWhereIdMatches(Connection con, int id) {
