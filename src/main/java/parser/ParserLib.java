@@ -1690,7 +1690,7 @@ class LazyExtractor{
 				counter++;
 				if(counter % 20 == 0) {
 					// System.out.printf("Tree[%d]:\n%s\n", counter, ler.getParsetree().tree_to_string());
-					System.out.printf("Tree[%d]:\n", counter);
+					System.out.printf("\t\t\tTree[%d]:\n", counter);
 				}
 //				 System.out.printf("Tree[%d]:\n%s\n", counter, ler.getParsetree().tree_to_string());
 			}

@@ -26,6 +26,7 @@ import java.util.concurrent.ThreadLocalRandom;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
+import org.sqlite.SQLiteException;
 
 
 
@@ -80,7 +81,7 @@ public class Fuzzer {
 	private HashSet<ParseTree> dd_random_trees_set_check = new HashSet<ParseTree>();
 	
 	private boolean log = false;
-	private final int MAX_INPUT_LENGTH = 20; // Sets the maximal input length when creating a string
+	private final int MAX_INPUT_LENGTH = 10; // Sets the maximal input length when creating a string
 	private HashSet<String> exclude_grammars = new HashSet<>(Arrays.asList("<anychar>", "<anychars>", "<anycharsp>", "<anycharp>"));
 	
 	
@@ -99,6 +100,7 @@ public class Fuzzer {
 		} else {
 			fuzzer = new Fuzzer("", 0, null, args[0], null); // Create new Fuzzer; initialize grammar
 		}
+		fuzzer.initializeGoldenGrammar();
 		try {
 			String url = returnDBPath();
 			System.out.printf("Try to connect or create db located at: %s\n", url);
@@ -115,7 +117,7 @@ public class Fuzzer {
 				 * */
 				createDB(url);
 				createTable(url);
-				fuzzer.create_valid_strings(2, fuzzer.log, con); // Create 20 valid strings; no log level enabled
+				fuzzer.create_valid_strings(10, fuzzer.log, con); // Create 20 valid strings; no log level enabled
 			} 
 			// If so, we can start with the analyzing
 			ResultSet rs = selectAllFromInputStrings(con);
@@ -433,7 +435,7 @@ public class Fuzzer {
 	private void initializeGoldenGrammar() {
 		try {
 			if(this.log) {
-				System.out.println("\n\n------------New run------------");					
+				System.out.println("\n\n-----------------------New run-----------------------");					
 			}
 			this.setCurr_pl(new ParserLib(this.getGrammar()));
 			this.setCurr_ep(new EarleyParser(this.getCurr_pl().grammar));
@@ -455,7 +457,7 @@ public class Fuzzer {
     		counter++;
     		String state = entry.getKey().toString();
     		Date date = new Date();
-    		System.out.println("\n\n----STATE " + counter + "/" + master.size() + ": " + state + " starting at " + new Timestamp(date.getTime()) + "----");
+    		System.out.println("\n\nRule " + counter + "/" + master.size() + ": " + state + " starting at " + new Timestamp(date.getTime()));
     		
     		if(this.getExclude_grammars().contains(state)) {
     			if(this.log) {
@@ -463,14 +465,24 @@ public class Fuzzer {
     			}
     			continue;
     		}
+    		int counter_token = 0;
     		for (int gRuleC = 0; gRuleC < entry.getValue().size(); gRuleC++) {
-    			if(this.log) {
-    				System.out.println("\nRule: " + entry.getValue().get(gRuleC).toString() + ", Size: " + entry.getValue().get(gRuleC).size());    				
-    			}
-    			if(entry.getValue().get(gRuleC).toString().contains("<anycharsp>")) {
-    				System.out.printf("");
-    			}
+    			counter_token++;
+    			System.out.printf("\tToken %d/%d: %s, starting at %s\t\n", 
+    					counter_token, 
+    					entry.getValue().size(), 
+    					entry.getValue().get(gRuleC).toString(),
+    					new Timestamp(date.getTime()).toString()
+    					);
+    			int counter_element = 0;
 				for(int elemC = 0; elemC < entry.getValue().get(gRuleC).size(); elemC++) {
+					counter_element++;
+	    			System.out.printf("\t\tElement %d/%d: %s, starting at %s\n", 
+	    					counter_element, 
+	    					entry.getValue().get(gRuleC).size(), 
+	    					master.get(state).get(gRuleC).get(elemC),
+	    					new Timestamp(date.getTime()).toString()
+	    					);
 					try {
                 		List<Object> lst_obj = getBestParseTreeForAdjustedState(state, master, gRuleC, elemC, created_string);
                 		if(lst_obj != null) {
@@ -487,8 +499,8 @@ public class Fuzzer {
                 	            SimpleDDSET sddset = new SimpleDDSET();
                 	            sddset.abstractTree(pss, getExclude_grammars(), this.getGolden_grammar_EP());
                 	            String output = pss.getAbstracted_tree() == null ? "" : pss.getAbstracted_tree().getOutputFormatAsJSON(this.exclude_grammars);
-                	            insertIntoTableProcessed(con, id, output, pss.getAbstracted_string(), pss.getChanged_rule(), pss.getChanged_token().toString(), pss.getChanged_elem(), created_string, "");
                 	            if(pss.getAbstracted_string().contains("<") && pss.getAbstracted_string().contains(">")) { // Was the abstraction successful?
+                	            	insertIntoTableProcessed(con, id, output, pss.getAbstracted_string(), pss.getChanged_rule(), pss.getChanged_token().toString(), pss.getChanged_elem(), created_string, "");
                 	            	addMinimalInputToList(pss);
                 	            }
                     		}
@@ -531,8 +543,8 @@ public class Fuzzer {
         	            sddset.abstractTree(pss, getExclude_grammars(), this.getGolden_grammar_EP());
         	            String output = pss.getAbstracted_tree() == null ? "" : pss.getAbstracted_tree().getOutputFormatAsJSON(this.exclude_grammars);
         				String changed_token = pss.getChanged_token() == null ? "<ANYCHARSP>" : pss.getChanged_token().toString();
-        				insertIntoTableProcessed(con, id, output, pss.getAbstracted_string(), pss.getChanged_rule(), changed_token, pss.getChanged_elem(), created_string, "");
         	            if(pss.getAbstracted_string().contains("<") && pss.getAbstracted_string().contains(">")) { // Was the abstraction successful?
+        	            	insertIntoTableProcessed(con, id, output, pss.getAbstracted_string(), pss.getChanged_rule(), changed_token, pss.getChanged_elem(), created_string, "");
         	            	addMinimalInputToList(pss);
         	            } else {
 							
@@ -613,26 +625,47 @@ public class Fuzzer {
 			pstmt.setString(4, changed_rule);
 			pstmt.setString(5, changed_token);
 			pstmt.setString(6, changed_element);
-			pstmt.setString(8, error_msg);
+			pstmt.setString(7, error_msg);
 			pstmt.executeUpdate();
-			printUpdate(con, id);
-			System.out.printf("Updated successful\n");
-		} catch (Exception e) {
-			if(created_string.equals("[K\f\b]")) {
-				System.out.printf("");
+			printUpdate(con, id, output, abstracted_input, changed_rule, changed_token, changed_element);
+			System.out.printf("Inserted successful into processed\n\n");
+		} catch (SQLiteException e) {
+			if(!e.toString().contains("[SQLITE_CONSTRAINT]")) {
+				System.out.printf("Untypical error during insertIntoTableProcessed: %s\n", e.toString());				
+			} else {
+				System.out.printf("Skip the insertions as there is already an entry with the same constraints:\n"
+						+ "Output: %s\n"
+						+ "Changed rule: %s\n"
+						+ "Changed token: %s\n"
+						+ "Changed element: %s\n"
+						+ "Abstracted input: %s\n-----------------------\n",
+						output,
+						changed_rule,
+						changed_token,
+						changed_element,
+						abstracted_input);
 			}
-			System.out.printf("Error during updateDB for string %s: %s\n", created_string, e.toString());
+		} catch (Exception e) {
+			System.out.printf("Error during insertIntoTableProcessed for string %s: %s\n", created_string, e.toString());
 			// System.exit(1);
 		}
 		
 	}
 
-	private void printUpdate(Connection con, int id) {
+	private void printUpdate(Connection con, int id, String output, String abstracted_string, String changed_rule, String changed_token, String changed_element) {
 		String sql_select_input_strings_row = "SELECT * FROM input_strings WHERE input_strings.id = ?";
-		String sql_select_processed_row = "SELECT * FROM processed WHERE processed.id_input_strings = ?";
+		String sql_select_processed_row = ""
+				+ "SELECT * "
+				+ "FROM processed "
+				+ "WHERE processed.id_input_strings = ?"
+				+ "  AND processed.output = ?"
+				+ "  AND processed.abstracted_input = ?"
+				+ "  AND processed.changed_rule = ?"
+				+ "  AND processed.changed_token = ?"
+				+ "  AND processed.changed_element = ?";
 		try {
 			PreparedStatement pstmt = con.prepareStatement(sql_select_input_strings_row);
-			pstmt.setInt(1, id);
+			pstmt.setInt(1, id);			
 			ResultSet rs = pstmt.executeQuery();
 			while(rs.next()) {
 				System.out.printf(""
@@ -646,24 +679,29 @@ public class Fuzzer {
 			System.out.printf("\n");
 			PreparedStatement pstmt_processed = con.prepareStatement(sql_select_processed_row);
 			pstmt_processed.setInt(1, id);
+			pstmt_processed.setString(2, output);
+			pstmt_processed.setString(3, abstracted_string);
+			pstmt_processed.setString(4, changed_rule);
+			pstmt_processed.setString(5, changed_token);
+			pstmt_processed.setString(6, changed_element);
 			rs = pstmt_processed.executeQuery();
 			while(rs.next()) {
-				System.out.printf(""
+				System.out.printf("Inserted the following entry "
+						+ "ID input strings: %d\n"
 						+ "Output: %s\n"
 						+ "Changed rule: %s\n"
 						+ "Changed token: %s\n"
 						+ "Changed element: %s\n"
-						+ "ID input strings: %d\n"
-						+ "Abstracted input: %s\n",
+						+ "Abstracted input: %s\n-----------------------\n",
+						rs.getInt("id_input_strings"),
 						rs.getString("output"),
 						rs.getString("changed_rule"),
 						rs.getString("changed_token"),
 						rs.getString("changed_element"),
-						rs.getInt("id_input_strings"),
 						rs.getString("abstracted_input"));
 			}
-		} catch (Exception e) {
-			System.out.printf("Error during printUpdate: %s\n", e.toString());
+		} catch (Exception e1) {
+			System.out.printf("Error during printUpdate: %s\n", e1.toString());
 		}
 		
 	}
