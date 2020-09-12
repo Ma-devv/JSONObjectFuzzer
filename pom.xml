@@ -10,7 +10,7 @@
 
   <name>EarleyParser</name>
   <!-- FIXME change it to the project's website -->
-  <url>https://github.com/vrthra/EarleyJava</url>
+  <url>https://github.com/Ma-devv/JSONObjectFuzzer</url>
 
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -91,6 +91,15 @@
           			<descriptorRef>jar-with-dependencies</descriptorRef>
         		</descriptorRefs>
       		</configuration>
+      		<executions>
+                <execution>
+                    <id>make-assembly</id>
+                    <phase>package</phase>
+                    <goals>
+                        <goal>single</goal>
+                    </goals>
+                </execution>
+            </executions>
 	    </plugin>
       </plugins>
     </pluginManagement>
