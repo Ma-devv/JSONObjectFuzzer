@@ -117,7 +117,7 @@ public class Fuzzer {
 				 * */
 				createDB(url);
 				createTable(url);
-				fuzzer.create_valid_strings(10, fuzzer.log, con); // Create 20 valid strings; no log level enabled
+				fuzzer.create_valid_strings(2, fuzzer.log, con); // Create 20 valid strings; no log level enabled
 			} 
 			// If so, we can start with the analyzing
 			ResultSet rs = selectAllFromInputStrings(con);
@@ -527,6 +527,10 @@ public class Fuzzer {
 				System.out.println("\nAdd <anycharsp> to the set of rules of " + state);
 			}
 			try {
+				System.out.printf("\t\tElement: %s, starting at %s\n", 
+    					"Added <anycharsp>",
+    					new Timestamp(date.getTime()).toString()
+    					);
         		List<Object> lst_obj = getBestParseTreeForAdjustedState(state, created_string, anycharsp);
         		if(lst_obj != null) {
         			ParseTree best_tree = (ParseTree) lst_obj.get(0);
@@ -569,20 +573,6 @@ public class Fuzzer {
 		}
     	// Update processed in the input_strings table for this id
     	updateTableInput_strings(con, id, 1, created_string);
-    	for(ParsedStringSettings pss : this.getListForEasiestMod()) {
-            System.out.printf(""
-            		+ "ID: %d\n"
-            		+ "Generated string: %s\n"
-            		+ "HDD string: %s\n"
-            		+ "DD string: %s\n"
-            		+ "Abstracted string: %s\n\n", 
-            		pss.hashCode(),
-            		pss.getCreated_string(),
-            		pss.getHdd_string(),
-            		pss.getDd_string(),
-            		pss.getAbstracted_tree().getAbstractedString("")
-            		);
-    	}
 	}
 	
 	private void updateTableInput_strings(Connection con, int id, int processed, String created_string) {
@@ -686,7 +676,7 @@ public class Fuzzer {
 			pstmt_processed.setString(6, changed_element);
 			rs = pstmt_processed.executeQuery();
 			while(rs.next()) {
-				System.out.printf("Inserted the following entry "
+				System.out.printf("Inserted the following entry\n"
 						+ "ID input strings: %d\n"
 						+ "Output: %s\n"
 						+ "Changed rule: %s\n"
