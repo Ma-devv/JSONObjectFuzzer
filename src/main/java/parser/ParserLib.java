@@ -23,8 +23,10 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Date;
 
 class GRule extends ArrayList<String> {
     public GRule() {
@@ -1207,12 +1209,18 @@ class EarleyParser extends Parser {
     }
 
     List<Column> fill_chart(List<Column> chart) {
+    	// Set start time
+    	Date startTime = new Date();
+    	Date endTime;
+    	long difference;
+//    	System.out.printf("Start fill chart at %s\n", startTime);
         for (int i = 0; i < chart.size(); i++) {
             Column col = chart.get(i);
                                                             
             // col.states get modified.
             int j = 0;
             while (j < col.states.size()) {
+            	// System.out.printf("Counter: %d\n", counter);
                 //for (State state: col.states)
                 State state = col.states.get(j++);
                 if (state.finished()) {
@@ -1240,6 +1248,15 @@ class EarleyParser extends Parser {
                         }
                     }
                 }
+                // To avoid endless runs
+                endTime = new Date(); // Get new time
+                difference = endTime.getTime() - startTime.getTime(); // Calculate the difference (in ms)
+                difference = difference / 1000; // Convert to seconds
+                // System.out.printf("Difference: %d\n", difference);
+                if(difference > 30) { // If the execution of this method took more than x seconds, just return the chart
+                	System.out.printf("Timeout in fill_chart. Processing took to long - return the current chart and continue\n");
+                	return chart;
+                }
             }
 
             if (this.log) {
@@ -1260,7 +1277,7 @@ class EarleyParser extends Parser {
         this.table = this.chart_parse(text, start_symbol); 
         List<State> states = new ArrayList<State>();
         for (int i = this.table.size(); i != 0; i--) {
-            Column col = this.table.get(i-1); // Need to work on the elements within col (State st)
+            Column col = this.table.get(i-1);
             for (State st : col.states) {
                 if (st.name.equals(start_symbol)) {
                     states.add(st);
@@ -1679,7 +1696,7 @@ class LazyExtractor{
 	    this.my_forest = parser.parse_forest(parser.table, start);
 	}
 	
-	public List<Object> extract_a_tree(int counter) {
+	public List<Object> extract_a_tree(int counter, boolean log) {
 		List<Object> obj = new ArrayList<Object>();
 		// choices = new ChoiceNode(null, 1, 0);
 		LEReturnTriple ler = null;
@@ -1687,11 +1704,12 @@ class LazyExtractor{
 			HashSet<LETriple> seen = new HashSet<LETriple>();
 			ler = extract_a_node(this.my_forest, seen, this.choices, null);
 			if(ler.getParsetree() != null) {
-				counter++;
-				if(counter % 20 == 0) {
+				Date date = new Date();
+				if(log && (counter == 1 || counter % 25 == 0)) {
 					// System.out.printf("Tree[%d]:\n%s\n", counter, ler.getParsetree().tree_to_string());
-					System.out.printf("\t\t\tTree[%d]:\n", counter);
+					System.out.printf("\t\t\tTree[%d], starting at %s\n", counter, new Timestamp(date.getTime()).toString());
 				}
+				counter++;
 //				 System.out.printf("Tree[%d]:\n%s\n", counter, ler.getParsetree().tree_to_string());
 			}
 			// ChoiceNode c = ler.getChoicenode();

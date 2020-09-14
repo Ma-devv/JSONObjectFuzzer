@@ -1,6 +1,8 @@
 package parser;
 
+import java.sql.Timestamp;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -195,9 +197,13 @@ public class HDD {
 		if(log) {
 			System.out.printf("Applying HDD\nID: %s\nString to minimize: %s\nTree to minimize:\n%s\n", pss.hashCode(), pss.getCreated_string(), pss.getHdd_tree().tree_to_string());
 		}
+		Date date = new Date();
+		System.out.printf("\t\t\tApply HDD, starting at %s\n", new Timestamp(date.getTime()));
 		this.setGolden_grammar_PL(golden_grammar_PL);
 		this.setGolden_grammar_EP(golden_grammar_EP);
 		String result = perses_delta_debug(pss.getHdd_tree(), pss.getPl().grammar, pss, pss, excludeSet, log);
+		date = new Date();
+		System.out.printf("\t\t\tFinished HDD, ending at %s\n", new Timestamp(date.getTime()));
 		pss.setHdd_string(result);
 		if(log) {
 			System.out.println("Updated HDD string: " + result);

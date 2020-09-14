@@ -1,6 +1,4 @@
 package parser;
-import java.io.ByteArrayOutputStream;
-import java.io.ObjectOutputStream;
 import java.nio.file.Paths;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
@@ -11,7 +9,6 @@ import java.sql.Statement;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -21,8 +18,6 @@ import java.util.Map.Entry;
 import java.util.Random;
 import java.util.Set;
 import java.util.TreeMap;
-import java.util.TreeSet;
-import java.util.concurrent.ThreadLocalRandom;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -81,7 +76,8 @@ public class Fuzzer {
 	private HashSet<ParseTree> dd_random_trees_set_check = new HashSet<ParseTree>();
 	
 	private boolean log = false;
-	private final int MAX_INPUT_LENGTH = 10; // Sets the maximal input length when creating a string
+	private final int MAX_INPUT_LENGTH = 1000; // Sets the maximal input length when creating a string
+	private final int produced_amount_of_parsetrees = 50; // Sets the amount of ParseTrees that is being generated during getBestParseTree
 	private HashSet<String> exclude_grammars = new HashSet<>(Arrays.asList("<anychar>", "<anychars>", "<anycharsp>", "<anycharp>"));
 	
 	
@@ -117,7 +113,7 @@ public class Fuzzer {
 				 * */
 				createDB(url);
 				createTable(url);
-				fuzzer.create_valid_strings(2, fuzzer.log, con); // Create 20 valid strings; no log level enabled
+				fuzzer.create_valid_strings(2000, fuzzer.log, con); // Create 20 valid strings; no log level enabled
 			} 
 			// If so, we can start with the analyzing
 			ResultSet rs = selectAllFromInputStrings(con);
@@ -230,12 +226,14 @@ public class Fuzzer {
 					}
 					fuzzer.initializeGoldenGrammar(); // To reset the grammar
 					String created_string = rs.getString("generated_string");
+					created_string = "{I?L3xS\b \f\b\f:$;	~1\b	 \b :[\bNMcQ\f,)UA@JRHRweh2~\b,|sL. ]\f \b}";
 					System.out.printf("Processing string [id: %d]: %s\n", id, created_string);
 					Date start_iteration = new Date();
 					fuzzer.change_everything_except_anychar_one_after_another(created_string, con, id);
 		        	Date end_iteration = new Date();
 		        	long difference_iteration = end_iteration.getTime() - start_iteration.getTime();
 		        	System.out.printf("Time that was needed for the processing of %s: %ds\n", created_string, difference_iteration / 1000);
+		        	System.exit(0);
 				}
 			}
 			for(ParsedStringSettings pss : fuzzer.getListForEasiestMod()) {
@@ -314,14 +312,14 @@ public class Fuzzer {
 		        	// Hence the string is valid for org.json.JSONObject 
 		        	// but is not according to the golden grammar
 		            // Change the golden grammar until the string can be parsed
-		        	i++;
 		        	System.out.println("Created string [" + (i) + "]: " + created_string);
 		        	if(!input_strings.contains(created_string)) { // Avoid duplicate strings
 		        		input_strings.add(created_string);
 		        		insertIntoInput_StringsTable(con, created_string, 0);
-		        	}
-		        	
-		        	// change_everything_except_anychar_one_after_another(created_string, con, 0);
+		        		i++;
+		        	} else {
+						System.out.printf("Already produced generated string => Skip %s\n", created_string);
+					}
 		        	
 		        	
 		        	// jsonarray.put(created_string);
@@ -458,7 +456,6 @@ public class Fuzzer {
     		String state = entry.getKey().toString();
     		Date date = new Date();
     		System.out.println("\n\nRule " + counter + "/" + master.size() + ": " + state + " starting at " + new Timestamp(date.getTime()));
-    		
     		if(this.getExclude_grammars().contains(state)) {
     			if(this.log) {
     				System.out.println("Skip " + state + " rule");
@@ -468,6 +465,7 @@ public class Fuzzer {
     		int counter_token = 0;
     		for (int gRuleC = 0; gRuleC < entry.getValue().size(); gRuleC++) {
     			counter_token++;
+    			date = new Date();
     			System.out.printf("\tToken %d/%d: %s, starting at %s\t\n", 
     					counter_token, 
     					entry.getValue().size(), 
@@ -477,6 +475,7 @@ public class Fuzzer {
     			int counter_element = 0;
 				for(int elemC = 0; elemC < entry.getValue().get(gRuleC).size(); elemC++) {
 					counter_element++;
+					date = new Date();
 	    			System.out.printf("\t\tElement %d/%d: %s, starting at %s\n", 
 	    					counter_element, 
 	    					entry.getValue().get(gRuleC).size(), 
@@ -484,7 +483,7 @@ public class Fuzzer {
 	    					new Timestamp(date.getTime()).toString()
 	    					);
 					try {
-                		List<Object> lst_obj = getBestParseTreeForAdjustedState(state, master, gRuleC, elemC, created_string);
+                		List<Object> lst_obj = getBestParseTreeForAdjustedState(state, master, gRuleC, elemC, created_string, true);
                 		if(lst_obj != null) {
                 			ParseTree best_tree = (ParseTree) lst_obj.get(0);
                 			// int length_of_anychar_chars = (int) lst_obj.get(1); UNUSED ATM
@@ -531,7 +530,7 @@ public class Fuzzer {
     					"Added <anycharsp>",
     					new Timestamp(date.getTime()).toString()
     					);
-        		List<Object> lst_obj = getBestParseTreeForAdjustedState(state, created_string, anycharsp);
+        		List<Object> lst_obj = getBestParseTreeForAdjustedState(state, created_string, anycharsp, true);
         		if(lst_obj != null) {
         			ParseTree best_tree = (ParseTree) lst_obj.get(0);
         			// int length_of_anychar_chars = (int) lst_obj.get(1); // UNUSED ATM
@@ -760,7 +759,7 @@ public class Fuzzer {
 	            		pt.count_leafes(),
 	            		state, 
 	            		null, 
-	            		"ADDED RULE <ANYCHARSP>",
+	            		"ADDED TOKEN <ANYCHARSP>",
 	            		new ParseTree(pt),
 	            		pt,
 	            		null,
@@ -776,7 +775,7 @@ public class Fuzzer {
 		}
 	}
 	
-	public static List<Object> parseStringUsingLazyExtractor(String created_string, EarleyParser ep, int max_rounds) {
+	public static List<Object> parseStringUsingLazyExtractor(String created_string, EarleyParser ep, int max_rounds, boolean log) {
 		List<Object> result_lst = new ArrayList<Object>();
 		ChoiceNode choices = new ChoiceNode(null, 1, 0);
 		int counter = 1;
@@ -788,7 +787,7 @@ public class Fuzzer {
 				} else {
 					le = new LazyExtractor(ep, created_string, choices, le.global_counter);
 				}
-				List<Object> lst = le.extract_a_tree(counter);
+				List<Object> lst = le.extract_a_tree(counter, log);
 				ParseTree pt = (ParseTree) lst.get(0);
 				ChoiceNode last_choice = (ChoiceNode) lst.get(1);
 				counter = (int) lst.get(2);
@@ -837,7 +836,7 @@ public class Fuzzer {
 	 * are being represented using <anychar> blocks)
 	 * Otherwise null
 	 * */
-	private List<Object> getBestParseTreeForAdjustedState(String state, HashMap<String, GDef> master, int gRuleC, int elemC, String created_string) {
+	private List<Object> getBestParseTreeForAdjustedState(String state, HashMap<String, GDef> master, int gRuleC, int elemC, String created_string, boolean log) {
 		try {
 			ParserLib pl_adjusted = null;
 			EarleyParser ep_adjusted = null;
@@ -851,7 +850,7 @@ public class Fuzzer {
 			ep_adjusted = new EarleyParser(pl_adjusted.grammar);
 			this.setCurr_pl(pl_adjusted);
 			this.setCurr_ep(ep_adjusted);
-			return parseStringUsingLazyExtractor(created_string, this.getCurr_ep(), 100);
+			return parseStringUsingLazyExtractor(created_string, this.getCurr_ep(), this.produced_amount_of_parsetrees, log);
 		} catch (Exception e) {
 			if(this.log) {
 				System.out.println("Failed to parse the string using the adjusted grammar; error: " + e.toString());
@@ -867,7 +866,7 @@ public class Fuzzer {
 	 * are being represented using <anychar> blocks)
 	 * Otherwise null
 	 * */
-	private List<Object> getBestParseTreeForAdjustedState(String state, String created_string, GRule anycharsp) {
+	private List<Object> getBestParseTreeForAdjustedState(String state, String created_string, GRule anycharsp, boolean log) {
 		try {
 			// Load the original master grammar
         	ParserLib pl_adjusted = null;
@@ -882,7 +881,7 @@ public class Fuzzer {
 			ep_adjusted = new EarleyParser(pl_adjusted.grammar);
 			this.setCurr_pl(pl_adjusted);
     		this.setCurr_ep(ep_adjusted);
-			return parseStringUsingLazyExtractor(created_string, this.getCurr_ep(), 100);
+			return parseStringUsingLazyExtractor(created_string, this.getCurr_ep(), this.produced_amount_of_parsetrees, log);
 		} catch (Exception e) {
   			if(this.log) {
 				System.out.println("Failed to parse the string using the adjusted grammar; error: " + e.toString());

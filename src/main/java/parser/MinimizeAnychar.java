@@ -1,7 +1,9 @@
 package parser;
 
+import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -16,6 +18,8 @@ public class MinimizeAnychar {
 	
 
 	public void startDD(ParsedStringSettings pss, EarleyParser ep_golden_grammar, ParserLib pl_golden_grammar, EarleyParser lazyExtractor) {
+		Date date = new Date();
+		System.out.printf("\t\t\tApply DD, starting at %s\n", new Timestamp(date.getTime()));
 		ParseTree hdd_tree_clone = new ParseTree(pss.getHdd_tree());
 		pss.setDd_tree(hdd_tree_clone);
 //			System.out.printf("%s", pss.toString());
@@ -64,7 +68,8 @@ public class MinimizeAnychar {
 //			System.out.printf("String before reducing <anychar> block to its minimum: %s"
 //					+ "\nString after reducing <anychar> block using DD: %s\n", pss.getHdd_string(), sb.toString());
 	
-		
+		date = new Date();
+		System.out.printf("\t\t\tFinished DD, ending at %s\n", new Timestamp(date.getTime()));
 	}
 
 	private TestHarness<Integer> harness = new TestHarness<Integer>() {

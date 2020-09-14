@@ -1,7 +1,9 @@
 package parser;
 
 import java.lang.reflect.Array;
+import java.sql.Timestamp;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -157,7 +159,7 @@ public class SimpleDDSET {
 				for(String s : as) {
 					sb.append(s);
 				}
-				List<Object> o = Fuzzer.parseStringUsingLazyExtractor(sb.toString(), earleyParserGG, 10);
+				List<Object> o = Fuzzer.parseStringUsingLazyExtractor(sb.toString(), earleyParserGG, 10, false);
 				if(o == null) {
 					continue;
 				}
@@ -205,6 +207,8 @@ public class SimpleDDSET {
 	public void abstractTree(ParsedStringSettings pss, HashSet<String> excludeSet, EarleyParser earleyParserGG) {
 		this.excludeSet = excludeSet;
 //		System.out.println(String.format("Abstract the following pss:\n%s\n", pss.toString()));
+		Date date = new Date();
+		System.out.printf("\t\t\tApply Simple DDSet, starting at %s\n", new Timestamp(date.getTime()));
 		ArrayList<Integer> path = new ArrayList<Integer>();
 		path.add(0);
 		path.add(0);
@@ -213,6 +217,8 @@ public class SimpleDDSET {
 			pss.setAbstracted_tree(abstracted_tree);
 			pss.setAbstracted_string(abstracted_tree.getAbstractedString(""));
 		}
+		date = new Date();
+		System.out.printf("\t\t\tFinished Simple DDSet, ending at %s\n", new Timestamp(date.getTime()));
 //		System.out.println(String.format("Abstracted the tree:\n%s\n", pss.toString()));
 	}
 }
