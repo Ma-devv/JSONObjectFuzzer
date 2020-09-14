@@ -6,6 +6,7 @@ import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.Statement;
+import java.sql.Time;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -78,6 +79,8 @@ public class Fuzzer {
 	private boolean log = false;
 	private final int MAX_INPUT_LENGTH = 1000; // Sets the maximal input length when creating a string
 	private final int produced_amount_of_parsetrees = 100; // Sets the amount of ParseTrees that is being generated during getBestParseTree
+	private final int generate_input_strings = 2000;
+	private final int max_time_to_determine_best_ParseTree = 900; // 15 minutes max for the determination of the best ParseTree
 	private HashSet<String> exclude_grammars = new HashSet<>(Arrays.asList("<anychar>", "<anychars>", "<anycharsp>", "<anycharp>"));
 	
 	
@@ -113,7 +116,7 @@ public class Fuzzer {
 				 * */
 				createDB(url);
 				createTable(url);
-				fuzzer.create_valid_strings(2000, fuzzer.log, con); // Create 20 valid strings; no log level enabled
+				fuzzer.create_valid_strings(fuzzer.generate_input_strings, fuzzer.log, con); // Create 20 valid strings; no log level enabled
 			} 
 			// If so, we can start with the analyzing
 			ResultSet rs = selectAllFromInputStrings(con);
@@ -226,7 +229,6 @@ public class Fuzzer {
 					}
 					fuzzer.initializeGoldenGrammar(); // To reset the grammar
 					String created_string = rs.getString("generated_string");
-					created_string = "{I?L3xS\b \f\b\f:$;	~1\b	 \b :[\bNMcQ\f,)UA@JRHRweh2~\b,|sL. ]\f \b}";
 					System.out.printf("Processing string [id: %d]: %s\n", id, created_string);
 					Date start_iteration = new Date();
 					fuzzer.change_everything_except_anychar_one_after_another(created_string, con, id);
@@ -774,11 +776,12 @@ public class Fuzzer {
 		}
 	}
 	
-	public static List<Object> parseStringUsingLazyExtractor(String created_string, EarleyParser ep, int max_rounds, boolean log) {
+	public static List<Object> parseStringUsingLazyExtractor(String created_string, EarleyParser ep, int max_rounds, boolean log, int max_time_to_determine_best_ParseTree) {
 		List<Object> result_lst = new ArrayList<Object>();
 		ChoiceNode choices = new ChoiceNode(null, 1, 0);
 		int counter = 1;
 		LazyExtractor le = null;
+		Date startTime = new Date();
 		while(true) {
 			try {
 				if(le == null) {
@@ -819,7 +822,13 @@ public class Fuzzer {
 				if(v == null) {
 					break;
 				}
-				if(counter > max_rounds) {
+				// Check how long the method is already running
+				Date endTime = new Date();
+				long difference = endTime.getTime() - startTime.getTime();
+				difference = difference / 1000; // Convert to ms
+				if(counter > max_rounds || difference > max_time_to_determine_best_ParseTree) { // If the method surpasses max rounds or the max time, break);
+					System.out.printf("\t\t\tLazyExtractor either surpassed the max. amount of rounds or the max. amount of time "
+							+ "allowed to determine the best ParseTree. Continue with the current result \n");
 					break;
 				}
 			} catch (Exception e) {
@@ -849,7 +858,7 @@ public class Fuzzer {
 			ep_adjusted = new EarleyParser(pl_adjusted.grammar);
 			this.setCurr_pl(pl_adjusted);
 			this.setCurr_ep(ep_adjusted);
-			return parseStringUsingLazyExtractor(created_string, this.getCurr_ep(), this.produced_amount_of_parsetrees, log);
+			return parseStringUsingLazyExtractor(created_string, this.getCurr_ep(), this.produced_amount_of_parsetrees, log, this.max_time_to_determine_best_ParseTree);
 		} catch (Exception e) {
 			if(this.log) {
 				System.out.println("Failed to parse the string using the adjusted grammar; error: " + e.toString());
@@ -880,7 +889,7 @@ public class Fuzzer {
 			ep_adjusted = new EarleyParser(pl_adjusted.grammar);
 			this.setCurr_pl(pl_adjusted);
     		this.setCurr_ep(ep_adjusted);
-			return parseStringUsingLazyExtractor(created_string, this.getCurr_ep(), this.produced_amount_of_parsetrees, log);
+			return parseStringUsingLazyExtractor(created_string, this.getCurr_ep(), this.produced_amount_of_parsetrees, log, this.max_time_to_determine_best_ParseTree);
 		} catch (Exception e) {
   			if(this.log) {
 				System.out.println("Failed to parse the string using the adjusted grammar; error: " + e.toString());

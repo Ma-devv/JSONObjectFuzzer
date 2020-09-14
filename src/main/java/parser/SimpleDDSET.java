@@ -159,7 +159,7 @@ public class SimpleDDSET {
 				for(String s : as) {
 					sb.append(s);
 				}
-				List<Object> o = Fuzzer.parseStringUsingLazyExtractor(sb.toString(), earleyParserGG, 10, false);
+				List<Object> o = Fuzzer.parseStringUsingLazyExtractor(sb.toString(), earleyParserGG, 10, false, 900);
 				if(o == null) {
 					continue;
 				}
