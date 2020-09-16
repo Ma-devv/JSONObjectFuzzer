@@ -78,7 +78,7 @@ public class Fuzzer {
 	
 	private boolean log = false;
 	private final int MAX_INPUT_LENGTH = 1000; // Sets the maximal input length when creating a string
-	private final int produced_amount_of_parsetrees = 100; // Sets the amount of ParseTrees that is being generated during getBestParseTree
+	private final int produced_amount_of_parsetrees = 25; // Sets the amount of ParseTrees that is being generated during getBestParseTree
 	private final int generate_input_strings = 2000;
 	private final int max_time_to_determine_best_ParseTree = 900; // 15 minutes max for the determination of the best ParseTree
 	private HashSet<String> exclude_grammars = new HashSet<>(Arrays.asList("<anychar>", "<anychars>", "<anycharsp>", "<anycharp>"));
